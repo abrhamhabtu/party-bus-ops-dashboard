@@ -207,7 +207,7 @@ function App() {
           <div className="brand">
             VEGAS<span>CONTROL</span>
             <span className="brand-divider" />
-            <span className="company">Fleet operations</span>
+            <span className="company">Discreet Transportation</span>
           </div>
           <div className="top-actions">
             <span className="demo-tag">
@@ -336,7 +336,7 @@ function App() {
               <div className="driver-greeting">
                 <span>YOUR SHIFT, SIMPLIFIED</span>
                 <h2>Good evening, Marcus.</h2>
-                <p>Midnight Express · VB-01</p>
+                <p>Buffalo · DL-01</p>
               </div>
               <div className={"shift-status " + (shiftEnd ? "on" : "")}>
                 <Radio size={20} />
@@ -358,7 +358,7 @@ function App() {
                   Shift length<strong>8 hours</strong>
                 </span>
                 <span>
-                  Assigned vehicle<strong>VB-01</strong>
+                  Assigned vehicle<strong>Buffalo</strong>
                 </span>
                 <span>
                   Next pickup<strong>Bellagio · 20:15</strong>
@@ -529,10 +529,10 @@ function App() {
               <h3>
                 {resolved
                   ? "Maintenance acknowledged"
-                  : "VB-12 · Maintenance due"}
+                  : "DL-12 · Maintenance due"}
               </h3>
               <p>
-                Lucky Seven is offline for its scheduled inspection. Keep this
+                Executive 3 is offline for its scheduled inspection. Keep this
                 vehicle out of dispatch until the inspection is complete.
               </p>
               <span className="subtle">Demo alert · 19:52 PDT</span>

@@ -29,18 +29,20 @@ import {
 } from "lucide-react";
 import type { MapVehicle } from "./FleetMap";
 const FleetMap = lazy(() => import("./FleetMap"));
-import { fleet } from "../lib/data";
+import { fleet, fleetCoordinate } from "../lib/data";
 import {
   atStation,
   completedRuns,
   coordinateAlong,
   inboundTo,
+  isAirport,
   phaseLabel,
   progressAt,
   routeStats,
   SESSION_START,
   shuttleFleet,
   stations,
+  terminalHopCoordinate,
   vehicleTiming,
   type CompletedRun,
   type Hotel,
@@ -48,19 +50,21 @@ import {
   type Station,
 } from "../lib/shuttling";
 const statusColors = {
-  "On trip": "#d9c777",
-  Available: "#79bec9",
-  "To pickup": "#a3bbdf",
+  "On trip": "#e2c48a",
+  Available: "#9ad0c6",
+  "To pickup": "#d7b48a",
   Offline: "#657586",
 };
 const shuttleColor = (v: ShuttleVehicle) =>
   v.freshnessSeconds > 120
     ? "#84909e"
     : v.phase === "outbound"
-      ? "#decb7b"
+      ? "#e2c48a"
       : v.phase === "return"
-        ? "#7bbcc9"
-        : "#9fafd2";
+        ? "#9ad0c6"
+        : v.phase === "terminal-hop"
+          ? "#d7b48a"
+          : "#c4b8a4";
 const formatTime = (m: number) =>
   `${Math.floor(m / 60)
     .toString()
@@ -115,7 +119,7 @@ export default function Operations({
     [minute, setMinute] = useState(SESSION_START),
     [expanded, setExpanded] = useState(false),
     [hotel, setHotel] = useState<Hotel>("venetian"),
-    [station, setStation] = useState<Station>("airport"),
+    [station, setStation] = useState<Station>("t1"),
     [shuttles, setShuttles] = useState(shuttleFleet),
     [runs, setRuns] = useState(completedRuns),
     [hasRecordedEvents, setHasRecordedEvents] = useState(false),
@@ -127,11 +131,17 @@ export default function Operations({
   useEffect(() => {
     if (!playing) return;
     const timer = setInterval(
-      () => setMinute((v) => Math.min(SESSION_START + 15, v + 0.25)),
-      1000,
+      () =>
+        setMinute((v) => {
+          const next = v + 0.5;
+          if (next >= SESSION_START + 15)
+            return hasRecordedEvents ? SESSION_START + 15 : SESSION_START;
+          return next;
+        }),
+      250,
     );
     return () => clearInterval(timer);
-  }, [playing]);
+  }, [playing, hasRecordedEvents]);
   useEffect(() => {
     if (!note) return;
     const timer = setTimeout(() => setNote(""), 4500);
@@ -172,7 +182,7 @@ export default function Operations({
   );
   const visibleShuttles = routeVehicles.filter(
     (v) =>
-      `${v.id} ${v.driver}`.toLowerCase().includes(query.toLowerCase()) &&
+      `${v.id} ${v.name} ${v.driver}`.toLowerCase().includes(query.toLowerCase()) &&
       (filter === "All" ||
         (filter === "Needs review" && !!timing(v).attention) ||
         (filter === "Inbound" && inboundTo(v, station)) ||
@@ -186,10 +196,15 @@ export default function Operations({
             return {
               id: v.id,
               driver: v.driver,
-              coordinates: coordinateAlong(
-                v.hotel,
-                v.phase === "return" ? 1 - p : p,
-              ),
+              coordinates:
+                v.phase === "terminal-hop"
+                  ? terminalHopCoordinate(p)
+                  : v.phase === "loading" || v.phase === "standby"
+                    ? stations[v.terminal].coordinates
+                    : coordinateAlong(
+                        v.hotel,
+                        v.phase === "return" ? 1 - p : p,
+                      ),
               color: shuttleColor(v),
               heading: 0,
               stale: v.freshnessSeconds > 120,
@@ -197,13 +212,16 @@ export default function Operations({
           })
         : fleet
             .filter((v) => v.status !== "Offline")
-            .map((v) => ({
-              id: v.id,
-              driver: v.driver,
-              coordinates: [v.lng, v.lat],
-              color: statusColors[v.status],
-              heading: 0,
-            })),
+            .map((v) => {
+              const [lng, lat] = fleetCoordinate(v, minute);
+              return {
+                id: v.id,
+                driver: v.driver,
+                coordinates: [lng, lat] as [number, number],
+                color: statusColors[v.status],
+                heading: 0,
+              };
+            }),
     [shuttle, shuttles, minute, runs],
   );
   const mapCommand = (kind: string) => setCommand({ kind, id: Date.now() });
@@ -215,7 +233,7 @@ export default function Operations({
   }
   function changeStation(s: Station) {
     setStation(s);
-    if (s !== "airport") setHotel(s);
+    if (!isAirport(s)) setHotel(s);
     setSelected(null);
     setFilter("All");
   }
@@ -248,6 +266,13 @@ export default function Operations({
         hotelArrival: undefined,
         hotelDepart: undefined,
         progress: 0.03,
+      };
+    if (v.phase === "terminal-hop")
+      next = {
+        ...next,
+        phase: "loading",
+        terminal: "t3",
+        progress: 0,
       };
     if (v.phase === "outbound")
       next = {
@@ -290,11 +315,12 @@ export default function Operations({
   }
   const moveLabel = (v: ShuttleVehicle) =>
     ({
-      loading: "Depart airport",
-      standby: "Depart airport",
+      loading: `Depart ${v.terminal === "t3" ? "T3" : "T1"} ground`,
+      standby: `Depart ${v.terminal === "t3" ? "T3" : "T1"} ground`,
       outbound: "Mark hotel arrival",
-      "hotel-stop": "Start return leg",
+      "hotel-stop": "Start return to airport",
       return: "Complete round trip",
+      "terminal-hop": "Arrive T3 ground",
     })[v.phase];
   const chartRuns = runs
     .filter((r) => r.hotel === hotel && r.airportReturn !== null)
@@ -398,7 +424,7 @@ export default function Operations({
         <h1>{shuttle ? "Shuttling" : "Las Vegas"}</h1>
         <p>
           {shuttle
-            ? "Airport ↔ Hotel operations"
+            ? "Airport ground · T1 holding, T3 overflow, Venetian returns"
             : "Metropolitan fleet operations"}
         </p>
       </div>
@@ -406,17 +432,19 @@ export default function Operations({
         <div className="station-switcher">
           <span>MANAGING FROM</span>
           <div>
-            {(["airport", "venetian", "virgin"] as Station[]).map((s) => (
+            {(["t1", "t3", "venetian", "virgin"] as Station[]).map((s) => (
               <button
                 key={s}
                 className={station === s ? "active" : ""}
                 onClick={() => changeStation(s)}
               >
-                {s === "airport"
-                  ? "Airport"
-                  : s === "venetian"
-                    ? "Venetian"
-                    : "Virgin Hotel"}
+                {s === "t1"
+                  ? "T1 ground"
+                  : s === "t3"
+                    ? "T3 ground"
+                    : s === "venetian"
+                      ? "Venetian"
+                      : "Virgin Hotel"}
               </button>
             ))}
           </div>
@@ -428,15 +456,16 @@ export default function Operations({
         </span>
         {(shuttle
           ? [
-              ["#decb7b", "To hotel"],
-              ["#7bbcc9", "To airport"],
-              ["#9fafd2", "At stop"],
+              ["#e2c48a", "To hotel"],
+              ["#9ad0c6", "To airport"],
+              ["#d7b48a", "T1 → T3"],
+              ["#c4b8a4", "At stop"],
               ["#84909e", "GPS stale"],
             ]
           : [
-              ["#d9c777", "On trip"],
-              ["#79bec9", "Available"],
-              ["#a3bbdf", "To pickup"],
+              ["#e2c48a", "On trip"],
+              ["#9ad0c6", "Available"],
+              ["#d7b48a", "To pickup"],
             ]
         ).map(([color, label]) => (
           <span key={label}>
@@ -493,11 +522,11 @@ export default function Operations({
                 setHotel(h);
                 setSelected(null);
                 setFilter("All");
-                if (station !== "airport") setStation(h);
+                if (!isAirport(station)) setStation(h);
               }}
             >
-              <option value="venetian">LAS ↔ The Venetian</option>
-              <option value="virgin">LAS ↔ Virgin Hotels</option>
+              <option value="venetian">T1 / T3 ↔ The Venetian</option>
+              <option value="virgin">T3 ↔ Virgin Hotels</option>
             </select>
           </label>
         )}
@@ -711,11 +740,13 @@ export default function Operations({
             <div className="section-heading">
               <h3>
                 Inbound to{" "}
-                {station === "airport"
-                  ? "airport"
-                  : station === "venetian"
-                    ? "Venetian"
-                    : "Virgin"}
+                {station === "t1"
+                  ? "T1 ground"
+                  : station === "t3"
+                    ? "T3 ground"
+                    : station === "venetian"
+                      ? "Venetian"
+                      : "Virgin"}
               </h3>
               <span className="tiny-count">{inbound.length}</span>
             </div>
@@ -753,16 +784,16 @@ export default function Operations({
           <section className="coverage-panel">
             <div className="section-heading">
               <h3>Operating hubs</h3>
-              <span>3 locations</span>
+              <span>4 locations</span>
             </div>
-            {(["airport", "venetian", "virgin"] as Station[]).map((s, i) => (
+            {(["t1", "t3", "venetian", "virgin"] as Station[]).map((s, i) => (
               <button key={s} onClick={() => mapCommand(s)}>
                 <span className="hub-index">0{i + 1}</span>
                 <span>
                   {stations[s].short}
                   <small>
-                    {s === "airport"
-                      ? "Airport staging"
+                    {isAirport(s)
+                      ? "Airport ground transportation"
                       : "Hotel pickup & drop-off"}
                   </small>
                 </span>
@@ -1002,8 +1033,10 @@ export default function Operations({
                           >
                             <i style={{ background: shuttleColor(v) }} />
                             <span>
-                              {v.id}
-                              <small>{v.driver}</small>
+                              {v.name}
+                              <small>
+                                {v.id} · {v.driver}
+                              </small>
                             </span>
                           </button>
                         </td>
@@ -1097,7 +1130,7 @@ export default function Operations({
           {playing ? <Pause size={14} /> : <Play size={14} />}
         </button>
         <span className="timeline-label">
-          DEMO REPLAY <small>{playing ? "15× speed" : "Paused"}</small>
+          DEMO REPLAY <small>{playing ? "Running" : "Paused"}</small>
         </span>
         <span className="timeline-start">20:18</span>
         <input

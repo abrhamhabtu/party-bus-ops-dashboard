@@ -1,14 +1,14 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap");
 :root {
-  font-family: "DM Sans", sans-serif;
-  color: #e6eae6;
-  background: #0e1113;
+  font-family: "IBM Plex Sans", sans-serif;
+  color: #ece7dc;
+  background: #090909;
   font-synthesis: none;
   font-weight: 400;
-  --panel: #161b1e;
-  --line: #2a3033;
-  --muted: #8b959b;
-  --accent: #b3ed80;
+  --panel: #121212;
+  --line: #2c2a26;
+  --muted: #9a9386;
+  --accent: #e2c48a;
 }
 * {
   box-sizing: border-box;
@@ -67,7 +67,7 @@ p {
 h1,
 h2,
 h3 {
-  font-family: "Manrope", sans-serif;
+  font-family: "Syne", sans-serif;
 }
 h2 {
   font-size: 14px;
@@ -106,9 +106,9 @@ button {
   width: 37px;
   height: 39px;
   background: var(--accent);
-  color: #162016;
-  border-radius: 10px;
-  transform: skew(-5deg);
+  color: #16120c;
+  border-radius: 2px;
+  transform: none;
 }
 .rail-nav {
   margin-top: 44px;

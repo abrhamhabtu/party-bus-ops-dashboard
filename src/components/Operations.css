@@ -1,29 +1,29 @@
 /* A map-first operations surface, derived from the supplied mobility simulator. */
 :root {
-  --accent: #91aed4;
-  --panel: #17212c;
-  --line: #2d3b4b;
-  --muted: #8e9aab;
-  color: #d7dee8;
-  background: #101820;
+  --accent: #e2c48a;
+  --panel: #141311;
+  --line: #2f2c27;
+  --muted: #9a9386;
+  color: #ece7dc;
+  background: #090909;
 }
 .app-shell {
-  background: #101820;
+  background: #090909;
 }
 .rail {
-  background: #121b25;
-  border-color: #283544;
+  background: #101010;
+  border-color: #2c2a26;
   width: 60px;
   padding-top: 15px;
 }
 .brand-mark {
   background: transparent;
-  color: #ced9e7;
+  color: #e2c48a;
   transform: none;
-  border: 1px solid #415367;
+  border: 1px solid #5c5344;
   width: 32px;
   height: 32px;
-  border-radius: 6px;
+  border-radius: 2px;
 }
 .brand-mark svg {
   width: 17px;
@@ -137,8 +137,8 @@
   min-height: 650px;
   isolation: isolate;
   overflow: hidden;
-  background: #151e28;
-  font-family: "DM Sans", sans-serif;
+  background: #0c0c0c;
+  font-family: "IBM Plex Sans", sans-serif;
 }
 .map-renderer,
 .vector-map,

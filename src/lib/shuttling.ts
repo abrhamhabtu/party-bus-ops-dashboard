@@ -1,16 +1,28 @@
 import roadRoutes from "./map/routes.json" with { type: "json" };
 export type Hotel = "venetian" | "virgin";
-export type Station = "airport" | Hotel;
+export type Terminal = "t1" | "t3";
+export type Station = Terminal | Hotel;
 export type Direction = "outbound" | "return";
 export type ShuttlePhase =
-  "outbound" | "return" | "loading" | "hotel-stop" | "standby";
+  | "outbound"
+  | "return"
+  | "loading"
+  | "hotel-stop"
+  | "standby"
+  | "terminal-hop";
+export const isAirport = (s: Station): s is Terminal => s === "t1" || s === "t3";
 export const stations: Record<
   Station,
   { name: string; short: string; coordinates: [number, number] }
 > = {
-  airport: {
-    name: "Harry Reid International",
-    short: "Airport · LAS",
+  t1: {
+    name: "Terminal 1 ground transportation",
+    short: "T1 ground",
+    coordinates: [-115.1455, 36.0838],
+  },
+  t3: {
+    name: "Terminal 3 ground transportation",
+    short: "T3 ground",
     coordinates: [-115.1483, 36.0851],
   },
   venetian: {
@@ -54,8 +66,10 @@ export const completedRuns: CompletedRun[] = [
 ];
 export type ShuttleVehicle = {
   id: string;
+  name: string;
   driver: string;
   hotel: Hotel;
+  terminal: Terminal;
   phase: ShuttlePhase;
   phaseStarted: number;
   cycleStarted: number | null;
@@ -69,21 +83,25 @@ export type ShuttleVehicle = {
 };
 export const shuttleFleet: ShuttleVehicle[] = [
   {
-    id: "VB-01",
+    id: "DL-01",
+    name: "Buffalo",
     driver: "Marcus Johnson",
     hotel: "venetian",
+    terminal: "t1",
     phase: "outbound",
     phaseStarted: 1201,
     cycleStarted: 1201,
     passengers: 24,
-    capacity: 30,
+    capacity: 40,
     progress: 0.71,
     freshnessSeconds: 8,
   },
   {
-    id: "VB-02",
+    id: "DL-02",
+    name: "Big Money",
     driver: "Sofia Martinez",
     hotel: "venetian",
+    terminal: "t1",
     phase: "return",
     phaseStarted: 1206,
     cycleStarted: 1176,
@@ -95,81 +113,119 @@ export const shuttleFleet: ShuttleVehicle[] = [
     freshnessSeconds: 12,
   },
   {
-    id: "VB-03",
+    id: "DL-03",
+    name: "Bankroll",
     driver: "James Wilson",
     hotel: "venetian",
+    terminal: "t1",
     phase: "outbound",
     phaseStarted: 1187,
     cycleStarted: 1187,
     passengers: 18,
-    capacity: 24,
+    capacity: 38,
     progress: 0.82,
     freshnessSeconds: 6,
   },
   {
-    id: "VB-04",
+    id: "DL-04",
+    name: "Let It Ride",
     driver: "Alex Rivera",
     hotel: "venetian",
+    terminal: "t1",
     phase: "loading",
     phaseStarted: 1204,
     cycleStarted: null,
     passengers: 18,
-    capacity: 30,
+    capacity: 38,
     progress: 0,
     freshnessSeconds: 4,
   },
   {
-    id: "VB-05",
+    id: "DL-05",
+    name: "Max Bet",
     driver: "Daniel Kim",
     hotel: "venetian",
+    terminal: "t1",
     phase: "hotel-stop",
     phaseStarted: 1214,
     cycleStarted: 1193,
     hotelArrival: 1214,
     passengers: 0,
-    capacity: 35,
+    capacity: 36,
     progress: 1,
     freshnessSeconds: 11,
   },
   {
-    id: "VB-06",
+    id: "DL-06",
+    name: "High Stakes",
     driver: "Taylor Brooks",
     hotel: "venetian",
+    terminal: "t1",
     phase: "return",
     phaseStarted: 1208,
     cycleStarted: 1180,
     hotelArrival: 1201,
     hotelDepart: 1208,
     passengers: 0,
-    capacity: 20,
+    capacity: 36,
     progress: 0.45,
     freshnessSeconds: 248,
   },
   {
-    id: "VB-08",
+    id: "DL-07",
+    name: "Double Up",
+    driver: "Jordan Davis",
+    hotel: "venetian",
+    terminal: "t1",
+    phase: "standby",
+    phaseStarted: 1210,
+    cycleStarted: null,
+    passengers: 0,
+    capacity: 30,
+    progress: 0,
+    freshnessSeconds: 9,
+  },
+  {
+    id: "DL-08",
+    name: "Executive 1",
     driver: "Sam Parker",
     hotel: "virgin",
+    terminal: "t3",
     phase: "outbound",
     phaseStarted: 1209,
     cycleStarted: 1209,
     passengers: 16,
-    capacity: 24,
+    capacity: 27,
     progress: 0.66,
     freshnessSeconds: 7,
   },
   {
-    id: "VB-09",
+    id: "DL-09",
+    name: "Executive 2",
     driver: "Casey Lee",
-    hotel: "virgin",
-    phase: "return",
-    phaseStarted: 1211,
-    cycleStarted: 1192,
-    hotelArrival: 1204,
-    hotelDepart: 1211,
+    hotel: "venetian",
+    terminal: "t1",
+    phase: "terminal-hop",
+    phaseStarted: 1212,
+    cycleStarted: null,
     passengers: 0,
-    capacity: 30,
-    progress: 0.5,
-    freshnessSeconds: 9,
+    capacity: 27,
+    progress: 0.42,
+    freshnessSeconds: 5,
+  },
+  {
+    id: "DL-10",
+    name: "Side Bet",
+    driver: "Drew Morgan",
+    hotel: "venetian",
+    terminal: "t3",
+    phase: "loading",
+    phaseStarted: 1215,
+    cycleStarted: null,
+    passengers: 6,
+    capacity: 12,
+    progress: 0,
+    freshnessSeconds: 6,
   },
 ];
 const average = (values: number[]) =>
@@ -195,9 +251,15 @@ export function vehicleTiming(
   runs = completedRuns,
 ) {
   const elapsed = Math.max(0, Math.floor(minute - v.phaseStarted));
-  const moving = v.phase === "outbound" || v.phase === "return";
+  const moving =
+    v.phase === "outbound" ||
+    v.phase === "return" ||
+    v.phase === "terminal-hop";
+  const hopMinutes = 8;
   const expected = moving
-    ? routeStats(v.hotel, runs)[v.phase as Direction]
+    ? v.phase === "terminal-hop"
+      ? hopMinutes
+      : routeStats(v.hotel, runs)[v.phase as Direction]
     : null;
   const threshold = moving ? (expected ?? 20) + travelBuffer : dwellLimit;
   const stale = v.freshnessSeconds > 120;
@@ -230,14 +292,23 @@ export function vehicleTiming(
   };
 }
 export function inboundTo(v: ShuttleVehicle, station: Station) {
-  return station === "airport"
-    ? v.phase === "return"
-    : v.hotel === station && v.phase === "outbound";
+  if (isAirport(station))
+    return v.phase === "return" && v.terminal === station;
+  return v.hotel === station && v.phase === "outbound";
 }
 export function atStation(v: ShuttleVehicle, station: Station) {
-  return station === "airport"
-    ? v.phase === "loading" || v.phase === "standby"
-    : v.hotel === station && v.phase === "hotel-stop";
+  if (isAirport(station))
+    return (
+      v.terminal === station &&
+      (v.phase === "loading" || v.phase === "standby")
+    );
+  return v.hotel === station && v.phase === "hotel-stop";
+}
+export function terminalHopCoordinate(fraction: number): [number, number] {
+  const a = stations.t1.coordinates,
+    b = stations.t3.coordinates;
+  const t = Math.max(0, Math.min(1, fraction));
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 }
 export function coordinateAlong(
   hotel: Hotel,
@@ -266,19 +337,27 @@ export function progressAt(
   minute: number,
   runs = completedRuns,
 ) {
-  if (v.freshnessSeconds > 120 || !["outbound", "return"].includes(v.phase))
-    return v.progress;
+  const moving =
+    v.phase === "outbound" ||
+    v.phase === "return" ||
+    v.phase === "terminal-hop";
+  if (v.freshnessSeconds > 120 || !moving) return v.progress;
+  const expected =
+    v.phase === "terminal-hop"
+      ? 8
+      : (routeStats(v.hotel, runs)[v.phase as Direction] ?? 20);
   const delta =
-    (minute - (v.positionMinute ?? SESSION_START)) /
-    Math.max(1, routeStats(v.hotel, runs)[v.phase as Direction] ?? 20);
+    (minute - (v.positionMinute ?? SESSION_START)) / Math.max(1, expected);
   return Math.min(0.97, Math.max(0.03, v.progress + delta));
 }
 export function phaseLabel(v: ShuttleVehicle) {
+  const pad = v.terminal === "t3" ? "T3" : "T1";
   return {
     outbound: `To ${v.hotel === "venetian" ? "Venetian" : "Virgin"}`,
-    return: "To airport",
-    loading: "Loading at airport",
-    "hotel-stop": "At hotel",
-    standby: "Ready at airport",
+    return: `To airport · ${pad} ground`,
+    loading: `Loading at ${pad} ground`,
+    "hotel-stop": "At hotel · return to airport next",
+    standby: `Holding at ${pad} ground`,
+    "terminal-hop": "T1 → T3 ground",
   }[v.phase];
 }

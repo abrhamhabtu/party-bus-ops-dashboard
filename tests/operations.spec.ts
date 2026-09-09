@@ -11,7 +11,7 @@ test("dispatch validates capacity, saves a trip, persists, and completes it", as
   await page.getByLabel("Destination", { exact: true }).fill("Sphere");
   await page.getByRole("spinbutton", { name: "Passengers" }).fill("40");
   await page.getByRole("button", { name: "Create trip", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("seats 30");
+  await expect(page.getByRole("alert")).toContainText("seats 38");
   await page.getByRole("spinbutton", { name: "Passengers" }).fill("24");
   await page.getByRole("button", { name: "Create trip", exact: true }).click();
   await expect(
@@ -70,9 +70,9 @@ test("3D map controls, filtering and shuttle boarding work", async ({
   await page.getByRole("button", { name: "Switch to 3D map" }).click();
   await page
     .getByRole("textbox", { name: "Search vehicles" })
-    .fill("Neon Nights");
+    .fill("Let It Ride");
   await expect(page.locator(".fleet-mini")).toHaveCount(1);
-  await page.getByRole("button", { name: "View VB-04", exact: true }).click();
+  await page.getByRole("button", { name: "View DL-04", exact: true }).click();
   await expect(page.getByLabel("Selected vehicle details")).toContainText(
     "Alex Rivera",
   );
@@ -80,15 +80,54 @@ test("3D map controls, filtering and shuttle boarding work", async ({
     .locator(".mode-control")
     .getByRole("button", { name: "Shuttling", exact: true })
     .click();
-  await page.getByRole("button", { name: "View VB-04", exact: true }).click();
+  await page.getByRole("button", { name: "View DL-04", exact: true }).click();
   await page
     .getByRole("button", { name: "Add passenger", exact: true })
     .click();
-  await expect(page.locator(".boarding-control")).toContainText("19 / 30");
+  await expect(page.locator(".boarding-control")).toContainText("19 / 38");
   await page
-    .getByRole("button", { name: "Depart airport", exact: true })
+    .getByRole("button", { name: "Depart T1 ground", exact: true })
     .click();
   await expect(page.locator(".inspector-status")).toContainText("To Venetian");
+});
+test("demo replay advances the clock and moves a mapped vehicle", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator('[data-map-ready="true"]')).toBeVisible({
+    timeout: 30000,
+  });
+  const before = await page.evaluate(() => {
+    const marker = document.querySelector('[aria-label^="Locate DL-01"]');
+    const box = marker?.getBoundingClientRect();
+    return {
+      clock: (
+        document.querySelector('[aria-label="Simulation time"]') as HTMLInputElement
+      ).value,
+      left: box?.left ?? 0,
+    };
+  });
+  await page.getByRole("button", { name: "Play simulation" }).click();
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        () =>
+          (
+            document.querySelector(
+              '[aria-label="Simulation time"]',
+            ) as HTMLInputElement
+          ).value,
+      ),
+    )
+    .not.toBe(before.clock);
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const marker = document.querySelector('[aria-label^="Locate DL-01"]');
+        return marker?.getBoundingClientRect().left ?? 0;
+      }),
+    )
+    .not.toBe(before.left);
 });
 test("driver ends demo shift and automatic expiry is enforced", async ({
   page,

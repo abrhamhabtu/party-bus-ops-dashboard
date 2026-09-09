@@ -60,4 +60,6 @@ Trip durations, ETAs, drivers, and vehicle positions are fictional. Cached road 
 
 ## Demo deployment
 
-Run `npm run build` and serve `dist/` on any static HTTPS host. This does not enable live operations. No deployment was performed or account connected. Provider credentials must never be added to Vite client environment variables.
+This is a static Vite app. For Netlify, connect the GitHub repo and use the included `netlify.toml` (`npm run build`, publish `dist/`). Locally: `npm run build` and serve `dist/` on any static HTTPS host.
+
+This does not enable live operations. Provider credentials must never be added to Vite client environment variables.
