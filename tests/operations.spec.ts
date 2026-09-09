@@ -9,9 +9,9 @@ test("dispatch validates capacity, saves a trip, persists, and completes it", as
     .fill("Test celebration");
   await page.getByLabel("Pickup", { exact: true }).fill("Bellagio");
   await page.getByLabel("Destination", { exact: true }).fill("Sphere");
-  await page.getByRole("spinbutton", { name: "Passengers" }).fill("40");
+  await page.getByRole("spinbutton", { name: "Passengers" }).fill("41");
   await page.getByRole("button", { name: "Create trip", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("seats 38");
+  await expect(page.getByRole("alert")).toContainText("seats 40");
   await page.getByRole("spinbutton", { name: "Passengers" }).fill("24");
   await page.getByRole("button", { name: "Create trip", exact: true }).click();
   await expect(
@@ -54,6 +54,22 @@ test("fleet map fills the canvas so vehicles stay visible", async ({
   expect(Math.abs(sizes.mapH - sizes.rendererH)).toBeLessThan(2);
   expect(sizes.markerH).toBeGreaterThan(20);
   expect(sizes.markerVisible).toBeTruthy();
+  const hasBusBody = await page.evaluate(
+    () => !!document.querySelector(".map-bus svg"),
+  );
+  expect(hasBusBody).toBeTruthy();
+  const slider = page.getByLabel("Simulation time");
+  await expect(slider).toHaveAttribute("max", "1439");
+  await expect(slider).toHaveAttribute("min", "0");
+  await expect(
+    page.getByRole("button", { name: /Locate Max Bet/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Locate Side Bet/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Locate Bankroll/ }),
+  ).toBeVisible();
 });
 test("3D map controls, filtering and shuttle boarding work", async ({
   page,
@@ -72,7 +88,7 @@ test("3D map controls, filtering and shuttle boarding work", async ({
     .getByRole("textbox", { name: "Search vehicles" })
     .fill("Let It Ride");
   await expect(page.locator(".fleet-mini")).toHaveCount(1);
-  await page.getByRole("button", { name: "View DL-04", exact: true }).click();
+  await page.getByRole("button", { name: "View Let It Ride", exact: true }).click();
   await expect(page.getByLabel("Selected vehicle details")).toContainText(
     "Alex Rivera",
   );
@@ -80,7 +96,7 @@ test("3D map controls, filtering and shuttle boarding work", async ({
     .locator(".mode-control")
     .getByRole("button", { name: "Shuttling", exact: true })
     .click();
-  await page.getByRole("button", { name: "View DL-04", exact: true }).click();
+  await page.getByRole("button", { name: "View Let It Ride", exact: true }).click();
   await page
     .getByRole("button", { name: "Add passenger", exact: true })
     .click();
@@ -98,7 +114,7 @@ test("demo replay advances the clock and moves a mapped vehicle", async ({
     timeout: 30000,
   });
   const before = await page.evaluate(() => {
-    const marker = document.querySelector('[aria-label^="Locate DL-01"]');
+    const marker = document.querySelector('[aria-label^="Locate Buffalo"]');
     const box = marker?.getBoundingClientRect();
     return {
       clock: (
@@ -123,7 +139,7 @@ test("demo replay advances the clock and moves a mapped vehicle", async ({
   await expect
     .poll(async () =>
       page.evaluate(() => {
-        const marker = document.querySelector('[aria-label^="Locate DL-01"]');
+        const marker = document.querySelector('[aria-label^="Locate Buffalo"]');
         return marker?.getBoundingClientRect().left ?? 0;
       }),
     )
@@ -139,6 +155,79 @@ test("driver ends demo shift and automatic expiry is enforced", async ({
   await expect(page.getByText("On shift · demo tracking active")).toBeVisible();
   await page.clock.fastForward(8 * 60 * 60 * 1000 + 5000);
   await expect(page.getByText("Off shift · tracking is off")).toBeVisible();
+});
+test("fleet night view uses the Strip-Fremont corridor; shuttling stays tight", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator('[data-map-ready="true"]')).toBeVisible({
+    timeout: 30000,
+  });
+  await expect(page.locator(".map-renderer")).toHaveAttribute(
+    "data-camera",
+    "night-corridor",
+  );
+  await expect(page.getByRole("heading", { name: "Strip · Fremont" })).toBeVisible();
+  await page.getByLabel("Simulation time").fill("720");
+  await expect(page.locator(".map-renderer")).toHaveAttribute(
+    "data-camera",
+    "valley",
+  );
+  await page
+    .locator(".mode-control")
+    .getByRole("button", { name: "Shuttling", exact: true })
+    .click();
+  await expect(page.locator(".map-renderer")).toHaveAttribute(
+    "data-camera",
+    "shuttle",
+  );
+  await expect(page.getByRole("heading", { name: "Shuttling" })).toBeVisible();
+});
+test("mobile shuttle chrome stays off the map so vehicles stay visible", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await expect(page.locator('[data-map-ready="true"]')).toBeVisible({
+    timeout: 30000,
+  });
+  await page
+    .locator(".mode-control")
+    .getByRole("button", { name: "Shuttling", exact: true })
+    .click();
+  await expect(page.locator(".map-renderer")).toHaveAttribute(
+    "data-camera",
+    "shuttle",
+  );
+  await expect(page.locator(".map-legend-compact")).toBeHidden();
+  await expect(page.locator(".geographic-title")).toBeHidden();
+  await expect(page.locator(".region-select")).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: /Locate Buffalo/ }),
+  ).toBeVisible();
+  const covered = await page.evaluate(() => {
+    const map = document.querySelector(".vector-map")!.getBoundingClientRect();
+    const marker = document
+      .querySelector(".map-bus")!
+      .getBoundingClientRect();
+    const blockers = [
+      ...document.querySelectorAll(
+        ".map-legend-compact, .geographic-title, .region-select",
+      ),
+    ].filter((el) => getComputedStyle(el).display !== "none");
+    return {
+      markerInMap:
+        marker.top >= map.top &&
+        marker.bottom <= map.bottom &&
+        marker.left >= map.left &&
+        marker.right <= map.right,
+      hasSvg: !!document.querySelector(".map-bus svg"),
+      blockerCount: blockers.length,
+    };
+  });
+  expect(covered.hasSvg).toBeTruthy();
+  expect(covered.markerInMap).toBeTruthy();
+  expect(covered.blockerCount).toBe(0);
 });
 test("desktop and mobile render without page errors or horizontal overflow", async ({
   page,

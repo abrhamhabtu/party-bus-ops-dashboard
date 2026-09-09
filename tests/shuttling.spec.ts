@@ -30,9 +30,9 @@ test("discreet fleet names match the published party-bus roster", () => {
 });
 
 test("demo replay interpolates vehicle positions over the example shift", () => {
-  const moving = fleet.find((v) => v.status === "On trip")!;
-  expect(fleetCoordinate(moving, SESSION_START)).not.toEqual(
-    fleetCoordinate(moving, SESSION_START + 10),
+  const buffalo = fleet.find((v) => v.name === "Buffalo")!;
+  expect(fleetCoordinate(buffalo, 8 * 60)).not.toEqual(
+    fleetCoordinate(buffalo, 21 * 60),
   );
 });
 
@@ -117,7 +117,7 @@ test("hotel switch, stale state, thresholds, and complete-cycle averages update 
   ).toContainText("32");
   await page.getByRole("button", { name: "T1 ground", exact: true }).click();
   await page.getByLabel("Shuttle route").selectOption("venetian");
-  await page.getByRole("button", { name: "View DL-06", exact: true }).click();
+  await page.getByRole("button", { name: "View High Stakes", exact: true }).click();
   await expect(page.getByLabel("Selected vehicle details")).toContainText(
     "Arrival estimate unavailable",
   );
@@ -125,7 +125,7 @@ test("hotel switch, stale state, thresholds, and complete-cycle averages update 
     page.getByRole("button", { name: "Complete round trip", exact: true }),
   ).toBeDisabled();
   await page.getByRole("button", { name: "Close vehicle details" }).click();
-  await page.getByRole("button", { name: "View DL-02", exact: true }).click();
+  await page.getByRole("button", { name: "View Big Money", exact: true }).click();
   await page
     .getByRole("button", { name: "Complete round trip", exact: true })
     .click();

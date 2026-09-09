@@ -171,7 +171,7 @@ export const mapStyle: StyleSpecification = {
       type: "fill-extrusion",
       source: "basemap",
       "source-layer": "building",
-      minzoom: 13,
+      minzoom: 12,
       paint: {
         "fill-extrusion-color": "#3b4855",
         "fill-extrusion-height": ["coalesce", ["get", "render_height"], 8],

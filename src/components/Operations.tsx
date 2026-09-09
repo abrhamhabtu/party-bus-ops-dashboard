@@ -29,7 +29,8 @@ import {
 } from "lucide-react";
 import type { MapVehicle } from "./FleetMap";
 const FleetMap = lazy(() => import("./FleetMap"));
-import { fleet, fleetCoordinate } from "../lib/data";
+import { fleet, fleetSnapshot, FLEET_DAY_MINUTES, FLEET_EVENING } from "../lib/data";
+import { isNightOps } from "../lib/map/cameras";
 import {
   atStation,
   completedRuns,
@@ -116,7 +117,8 @@ export default function Operations({
     [showBuildings, setShowBuildings] = useState(true),
     [command, setCommand] = useState({ kind: "", id: 0 }),
     [playing, setPlaying] = useState(false),
-    [minute, setMinute] = useState(SESSION_START),
+    [fleetMinute, setFleetMinute] = useState(FLEET_EVENING),
+    [shuttleMinute, setShuttleMinute] = useState(SESSION_START),
     [expanded, setExpanded] = useState(false),
     [hotel, setHotel] = useState<Hotel>("venetian"),
     [station, setStation] = useState<Station>("t1"),
@@ -128,20 +130,26 @@ export default function Operations({
     [travelBuffer, setTravelBuffer] = useState(5),
     [dwellLimit, setDwellLimit] = useState(10),
     [note, setNote] = useState("");
+  const minute = shuttle ? shuttleMinute : fleetMinute;
   useEffect(() => {
     if (!playing) return;
-    const timer = setInterval(
-      () =>
-        setMinute((v) => {
+    const timer = setInterval(() => {
+      if (shuttle) {
+        setShuttleMinute((v) => {
           const next = v + 0.5;
           if (next >= SESSION_START + 15)
             return hasRecordedEvents ? SESSION_START + 15 : SESSION_START;
           return next;
-        }),
-      250,
-    );
+        });
+      } else {
+        setFleetMinute((v) => {
+          const next = v + 8;
+          return next >= FLEET_DAY_MINUTES ? 0 : next;
+        });
+      }
+    }, shuttle ? 250 : 180);
     return () => clearInterval(timer);
-  }, [playing, hasRecordedEvents]);
+  }, [playing, shuttle, hasRecordedEvents]);
   useEffect(() => {
     if (!note) return;
     const timer = setTimeout(() => setNote(""), 4500);
@@ -173,12 +181,17 @@ export default function Operations({
   const queued = shuttles.filter((v) => atStation(v, station));
   const activeShuttle = shuttles.find((v) => v.id === selected),
     activeFleet = fleet.find((v) => v.id === selected);
-  const visibleFleet = fleet.filter(
-    (v) =>
+  const fleetLive = fleet.map((v) => ({
+    v,
+    snap: fleetSnapshot(v, fleetMinute),
+  }));
+  const activeSnap = fleetLive.find((item) => item.v.id === selected)?.snap;
+  const visibleFleet = fleetLive.filter(
+    ({ v, snap }) =>
       `${v.name} ${v.id} ${v.driver}`
         .toLowerCase()
         .includes(query.toLowerCase()) &&
-      (filter === "All" || v.status === filter),
+      (filter === "All" || snap.status === filter),
   );
   const visibleShuttles = routeVehicles.filter(
     (v) =>
@@ -195,6 +208,7 @@ export default function Operations({
             const p = progressAt(v, minute, runs);
             return {
               id: v.id,
+              name: v.name,
               driver: v.driver,
               coordinates:
                 v.phase === "terminal-hop"
@@ -210,19 +224,17 @@ export default function Operations({
               stale: v.freshnessSeconds > 120,
             };
           })
-        : fleet
-            .filter((v) => v.status !== "Offline")
-            .map((v) => {
-              const [lng, lat] = fleetCoordinate(v, minute);
-              return {
-                id: v.id,
-                driver: v.driver,
-                coordinates: [lng, lat] as [number, number],
-                color: statusColors[v.status],
-                heading: 0,
-              };
-            }),
-    [shuttle, shuttles, minute, runs],
+        : fleetLive
+            .filter(({ snap }) => snap.status !== "Offline")
+            .map(({ v, snap }) => ({
+              id: v.id,
+              name: v.name,
+              driver: v.driver,
+              coordinates: snap.coordinates,
+              color: v.color,
+              heading: 0,
+            })),
+    [shuttle, shuttles, minute, runs, fleetLive],
   );
   const mapCommand = (kind: string) => setCommand({ kind, id: Date.now() });
   function changeMode(next: boolean) {
@@ -238,7 +250,8 @@ export default function Operations({
     setFilter("All");
   }
   function reset() {
-    setMinute(SESSION_START);
+    setFleetMinute(FLEET_EVENING);
+    setShuttleMinute(SESSION_START);
     setPlaying(false);
     setShuttles(shuttleFleet);
     setRuns(completedRuns);
@@ -344,6 +357,7 @@ export default function Operations({
           showVehicles={showVehicles}
           showBuildings={showBuildings}
           perspective={perspective}
+          minute={fleetMinute}
           command={command}
         />
       </Suspense>
@@ -351,11 +365,24 @@ export default function Operations({
         <button
           className="region-select"
           onClick={() => mapCommand("reset")}
-          title="Return to service area"
+          title={
+            shuttle
+              ? "Return to airport loop"
+              : isNightOps(fleetMinute)
+                ? "Return to Strip and Fremont"
+                : "Return to valley frame"
+          }
         >
           <MapPin size={15} />
           <span>
-            Las Vegas <small>Service area</small>
+            {shuttle ? "Airport loop" : isNightOps(fleetMinute) ? "Night corridor" : "Valley"}
+            <small>
+              {shuttle
+                ? "T1 / T3 · Strip"
+                : isNightOps(fleetMinute)
+                  ? "Strip · Fremont"
+                  : "Day coverage"}
+            </small>
           </span>
           <ChevronDown size={13} />
         </button>
@@ -421,11 +448,19 @@ export default function Operations({
       )}
       <div className="geographic-title">
         <span>NEVADA / CLARK COUNTY</span>
-        <h1>{shuttle ? "Shuttling" : "Las Vegas"}</h1>
+        <h1>
+          {shuttle
+            ? "Shuttling"
+            : isNightOps(fleetMinute)
+              ? "Strip · Fremont"
+              : "Las Vegas valley"}
+        </h1>
         <p>
           {shuttle
             ? "Airport ground · T1 holding, T3 overflow, Venetian returns"
-            : "Metropolitan fleet operations"}
+            : isNightOps(fleetMinute)
+              ? "Busy-night frame · hotel hops, downtown and Fremont"
+              : "Day coverage · suburbs to the Strip"}
         </p>
       </div>
       {shuttle && (
@@ -474,7 +509,12 @@ export default function Operations({
           </span>
         ))}
         <div className="legend-boundary">
-          <i /> Service boundary
+          <i />
+          {shuttle
+            ? "Airport loop"
+            : isNightOps(fleetMinute)
+              ? "Night corridor"
+              : "Valley boundary"}
         </div>
       </div>
       <div className="map-navigation">
@@ -625,27 +665,27 @@ export default function Operations({
               />
               <MiniStat
                 label="On the road"
-                value={fleet.filter((v) => v.status !== "Offline").length}
+                value={fleetLive.filter(({ snap }) => snap.status !== "Offline").length}
                 unit="online"
               />
               <MiniStat
                 label="Passengers"
-                value={fleet.reduce((a, v) => a + v.passengers, 0)}
+                value={fleetLive.reduce((a, { snap }) => a + snap.passengers, 0)}
                 unit="on board"
               />
               <MiniStat
                 label="Available"
-                value={fleet.filter((v) => v.status === "Available").length}
+                value={fleetLive.filter(({ snap }) => snap.status === "Available").length}
                 unit="vehicles"
               />
               <MiniStat
                 label="To pickup"
-                value={fleet.filter((v) => v.status === "To pickup").length}
+                value={fleetLive.filter(({ snap }) => snap.status === "To pickup").length}
                 unit="vehicles"
               />
               <MiniStat
                 label="Maintenance"
-                value={fleet.filter((v) => v.status === "Offline").length}
+                value={fleetLive.filter(({ snap }) => snap.status === "Offline").length}
                 unit="offline"
                 warn
               />
@@ -763,7 +803,7 @@ export default function Operations({
                   <span>
                     <strong>{v.driver}</strong>
                     <small>
-                      {v.id} · {phaseLabel(v)}
+                      {v.name} · {phaseLabel(v)}
                     </small>
                   </span>
                   <b className={timing(v).stale ? "muted" : ""}>
@@ -819,9 +859,10 @@ export default function Operations({
           <div className="inspector-heading">
             <div>
               <span className="micro-label">
-                {selected} / {shuttle ? "SHUTTLING" : "FLEET"}
+                {shuttle ? activeShuttle?.driver : activeFleet?.driver} ·{" "}
+                {shuttle ? "SHUTTLING" : "FLEET"}
               </span>
-              <h2>{shuttle ? activeShuttle?.driver : activeFleet?.name}</h2>
+              <h2>{shuttle ? activeShuttle?.name : activeFleet?.name}</h2>
             </div>
             <button
               className="quiet-button"
@@ -927,19 +968,19 @@ export default function Operations({
                 Manual event · demo workspace only
               </p>
             </>
-          ) : activeFleet ? (
+          ) : activeFleet && activeSnap ? (
             <>
               <div className="inspector-status">
-                <span style={{ color: statusColors[activeFleet.status] }}>
+                <span style={{ color: activeFleet.color }}>
                   <i />
-                  {activeFleet.status}
+                  {activeSnap.status}
                 </span>
                 <small>{activeFleet.driver}</small>
               </div>
               <div className="fleet-inspector-values">
                 <span>
                   <Users size={15} />
-                  {activeFleet.passengers} / {activeFleet.capacity} guests
+                  {activeSnap.passengers} / {activeFleet.capacity} guests
                 </span>
                 <span>
                   <Fuel size={15} />
@@ -948,8 +989,8 @@ export default function Operations({
               </div>
               <div className="inspector-destination">
                 <MapPin size={14} />
-                {activeFleet.destination}
-                <b>{activeFleet.eta ? `${activeFleet.eta} min` : "—"}</b>
+                {activeSnap.destination}
+                <b>{activeSnap.eta ? `${activeSnap.eta} min` : "—"}</b>
               </div>
             </>
           ) : null}
@@ -1028,15 +1069,13 @@ export default function Operations({
                         <td>
                           <button
                             className="row-vehicle"
-                            aria-label={`View ${v.id}`}
+                            aria-label={`View ${v.name}`}
                             onClick={() => setSelected(v.id)}
                           >
                             <i style={{ background: shuttleColor(v) }} />
                             <span>
                               {v.name}
-                              <small>
-                                {v.id} · {v.driver}
-                              </small>
+                              <small>{v.driver}</small>
                             </span>
                           </button>
                         </td>
@@ -1067,7 +1106,7 @@ export default function Operations({
                         <td>
                           <button
                             className="quiet-button"
-                            aria-label={`Inspect ${v.id}`}
+                            aria-label={`Inspect ${v.name}`}
                             onClick={() => setSelected(v.id)}
                           >
                             <ArrowUpRight size={14} />
@@ -1084,33 +1123,28 @@ export default function Operations({
             </div>
           ) : (
             <div className="fleet-cards">
-              {visibleFleet.map((v) => (
+              {visibleFleet.map(({ v, snap }) => (
                 <button
                   className={
                     "fleet-mini " + (selected === v.id ? "selected" : "")
                   }
                   key={v.id}
-                  aria-label={`View ${v.id}`}
+                  aria-label={`View ${v.name}`}
                   onClick={() => setSelected(v.id)}
                 >
-                  <span
-                    className="mini-bus"
-                    style={{ color: statusColors[v.status] }}
-                  >
+                  <span className="mini-bus" style={{ color: v.color }}>
                     <BusFront size={19} />
                   </span>
                   <span>
-                    <strong>
-                      {v.id} <em>{v.name}</em>
-                    </strong>
+                    <strong>{v.name}</strong>
                     <small>{v.driver}</small>
                   </span>
                   <span
                     className="mini-status"
-                    style={{ color: statusColors[v.status] }}
+                    style={{ color: statusColors[snap.status] }}
                   >
-                    {v.status}
-                    <small>{v.eta ? `${v.eta} min` : "—"}</small>
+                    {snap.status}
+                    <small>{snap.eta ? `${snap.eta} min` : "—"}</small>
                   </span>
                 </button>
               ))}
@@ -1130,25 +1164,28 @@ export default function Operations({
           {playing ? <Pause size={14} /> : <Play size={14} />}
         </button>
         <span className="timeline-label">
-          DEMO REPLAY <small>{playing ? "Running" : "Paused"}</small>
+          {shuttle ? "DEMO REPLAY" : "24-HOUR REPLAY"}{" "}
+          <small>{playing ? "Running" : "Paused"}</small>
         </span>
-        <span className="timeline-start">20:18</span>
+        <span className="timeline-start">{shuttle ? "20:18" : "00:00"}</span>
         <input
           aria-label="Simulation time"
           type="range"
-          min={SESSION_START}
-          max={SESSION_START + 15}
-          step={0.25}
+          min={shuttle ? SESSION_START : 0}
+          max={shuttle ? SESSION_START + 15 : FLEET_DAY_MINUTES - 1}
+          step={shuttle ? 0.25 : 1}
           value={minute}
           onChange={(e) => {
-            if (Number(e.target.value) < minute && hasRecordedEvents) {
+            const next = Number(e.target.value);
+            if (shuttle && next < minute && hasRecordedEvents) {
               setNote(
                 "Reset the example shift before rewinding recorded events.",
               );
               return;
             }
             setPlaying(false);
-            setMinute(Number(e.target.value));
+            if (shuttle) setShuttleMinute(next);
+            else setFleetMinute(next);
           }}
         />
         <span className="timeline-clock">
@@ -1168,7 +1205,10 @@ export default function Operations({
       </div>
       <div className="map-bottom-note">
         <span>
-          <Radio size={10} /> Simulated positions · no live tracking
+          <Radio size={10} />{" "}
+          {shuttle
+            ? "Simulated positions · no live tracking"
+            : "Valley-wide demo day · suburb runs by day, Strip hops at night"}
         </span>
         <span>Drag to pan · right-drag to rotate</span>
       </div>

@@ -210,10 +210,10 @@
 .mode-control,
 .map-tool {
   height: 35px;
-  background: #17222fef;
-  border: 1px solid #3a4b5e;
-  border-radius: 4px;
-  color: #b8c6d7;
+  background: #12100ce8;
+  border: 1px solid #3a352c;
+  border-radius: 2px;
+  color: #d8d0c2;
 }
 .region-select {
   padding: 0 10px;
@@ -248,9 +248,9 @@
   gap: 6px;
 }
 .mode-control button.selected {
-  background: #345c8d;
-  color: #e1eafa;
-  box-shadow: 0 0 0 1px #557cb033 inset;
+  background: #2a2418;
+  color: #f3ead6;
+  box-shadow: inset 0 -1px 0 #c4a574;
 }
 .map-toolbar-end {
   margin-left: auto;
@@ -321,19 +321,19 @@
 .geographic-title > span {
   font-size: 8px;
   letter-spacing: 2.3px;
-  color: #7c92aa;
+  color: #8a8170;
 }
 .geographic-title h1 {
   font:
-    500 33px "Manrope",
+    600 30px "Syne",
     sans-serif;
-  letter-spacing: -1.4px;
+  letter-spacing: -0.6px;
   margin: 7px 0;
-  color: #e0e7f0;
+  color: #efe8d8;
 }
 .geographic-title p {
   font-size: 10px;
-  color: #8c9eb3;
+  color: #9a9182;
 }
 .station-switcher {
   position: absolute;
@@ -811,17 +811,17 @@
 .map-navigation button {
   height: 31px;
   width: 31px;
-  background: #192735ec;
-  border: 1px solid #3e536b;
-  border-radius: 4px;
+  background: #12100ce8;
+  border: 1px solid #3a352c;
+  border-radius: 2px;
   font-size: 10px;
   font-weight: 600;
-  color: #9fb4ce;
+  color: #cfc6b4;
 }
 .map-navigation button.engaged {
-  background: #2b4666;
-  color: #c4dcff;
-  border-color: #597b9f;
+  background: #2a2418;
+  color: #f0e6d0;
+  border-color: #c4a574;
 }
 .map-bus {
   background: transparent;
@@ -833,35 +833,59 @@
   padding: 8px;
   color: var(--vehicle-color);
   cursor: pointer;
-  width: 52px;
+  width: auto;
+  min-width: 52px;
+  min-height: 28px;
+  overflow: visible;
   filter: drop-shadow(0px 3px 3px #0009);
 }
+.map-bus i {
+  display: none;
+}
 .map-bus svg {
-  width: 32px;
-  height: 23px;
-  transition: filter 0.15s;
+  display: block;
+  width: 38px;
+  height: 25px;
+  transition: filter 0.15s, transform 0.35s ease-out;
+  flex-shrink: 0;
 }
 .map-bus > span {
-  font-family: "DM Sans", sans-serif;
-  font-size: 8px;
-  background: #172331cc;
-  border: 1px solid #5b6d8055;
-  color: #aebdd1;
-  padding: 2px 4px;
-  border-radius: 2px;
+  font-family: "Syne", sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: #16120ce8;
+  border: 1px solid var(--vehicle-color);
+  color: #f4efe4;
+  padding: 2px 6px;
+  border-radius: 1px;
   white-space: nowrap;
+  transform: translate(var(--lx, 0px), var(--ly, 0px));
+  pointer-events: none;
+  position: relative;
+  z-index: 2;
+}
+.map-bus.spread > span {
+  box-shadow: 0 0 0 1px #0008;
+  z-index: 3;
 }
 .map-bus.chosen svg,
 .map-bus:hover svg {
   filter: drop-shadow(0 0 5px var(--vehicle-color));
 }
+.map-bus.chosen i {
+  display: none;
+}
 .map-bus.chosen > span {
-  border-color: #91b8e9;
-  color: #d1e1f5;
-  background: #293f58;
+  border-color: #e2c48a;
+  color: #f3ead6;
+  background: #2a2418;
 }
 .map-bus.stale svg {
   opacity: 0.6;
+}
+.map-bus.stale i {
+  display: none;
 }
 .fleet-dock {
   position: absolute;
@@ -1665,33 +1689,28 @@
     overflow: hidden;
   }
   .map-toolbar {
-    top: 12px;
-    left: 12px;
-    right: 12px;
+    top: 10px;
+    left: 10px;
+    right: 10px;
     gap: 6px;
-    height: 34px;
+    height: 32px;
   }
-  .region-select {
-    height: 31px;
-    padding: 0 8px;
-    font-size: 9px;
-    gap: 5px;
-  }
-  .region-select svg {
-    width: 12px;
-  }
-  .region-select > svg:last-child {
+  .region-select,
+  .geographic-title,
+  .map-legend-compact,
+  .simulation-indicator,
+  .map-tool span {
     display: none;
   }
   .mode-control {
-    height: 31px;
+    height: 32px;
     padding: 2px;
   }
   .mode-control button {
-    height: 25px;
+    height: 26px;
     font-size: 9px;
-    padding: 0 7px;
-    gap: 5px;
+    padding: 0 8px;
+    gap: 4px;
   }
   .mode-control button svg {
     width: 12px;
@@ -1701,74 +1720,41 @@
     gap: 0;
   }
   .map-tool {
-    height: 31px;
-    padding: 0 7px;
+    height: 32px;
+    width: 32px;
+    padding: 0;
+    justify-content: center;
   }
   .map-tool svg {
     width: 14px;
   }
-  .geographic-title {
-    left: 17px;
-    top: 70px;
-  }
-  .geographic-title > span {
-    font-size: 6px;
-    letter-spacing: 1.7px;
-  }
-  .geographic-title h1 {
-    font-size: 26px;
-    letter-spacing: -1px;
-    margin: 5px 0;
-  }
-  .geographic-title p {
-    font-size: 9px;
-  }
   .station-switcher {
-    top: 156px;
-    left: 17px;
+    top: 50px;
+    left: 10px;
+    right: 52px;
   }
   .station-switcher > span {
-    font-size: 7px;
-    margin-bottom: 6px;
-  }
-  .station-switcher button {
-    padding: 6px 9px;
-    font-size: 9px;
+    display: none;
   }
   .station-switcher > div {
-    background: #172838ee;
+    width: 100%;
+    background: #121a24e6;
+    border-color: #3a4d63;
   }
-  .map-legend-compact {
-    top: 339px;
-    bottom: auto;
-    left: 12px;
-    width: 117px;
-    gap: 6px;
-    padding: 9px;
-    background: #142433ed;
-  }
-  .map-legend-compact > span {
+  .station-switcher button {
+    flex: 1;
+    padding: 6px 4px;
     font-size: 8px;
-    gap: 6px;
-  }
-  .map-legend-compact .legend-title {
-    font-size: 6px;
-    margin-bottom: 3px;
-  }
-  .legend-boundary {
-    font-size: 7px;
-    padding-top: 6px;
-    gap: 6px;
   }
   .map-navigation {
-    top: 317px;
+    top: 386px;
     bottom: auto;
-    right: 12px;
+    right: 10px;
     gap: 4px;
   }
   .map-navigation button {
-    width: 29px;
-    height: 29px;
+    width: 28px;
+    height: 28px;
   }
   .map-layer-popover {
     right: 12px;
@@ -1776,7 +1762,7 @@
     width: 190px;
   }
   .map-bus > span {
-    font-size: 7px;
+    font-size: 8px;
   }
   .map-bus svg {
     width: 28px;

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ArrowRight, X } from "lucide-react";
-import { fleet, type Trip } from "../lib/data";
+import { fleet, fleetSnapshot, FLEET_EVENING, type Trip } from "../lib/data";
 
 export default function NewTrip({
   onClose,
@@ -119,7 +119,7 @@ export default function NewTrip({
                 name="passengers"
                 type="number"
                 min="1"
-                max="40"
+                max="50"
                 defaultValue="20"
                 required
               />
@@ -127,6 +127,13 @@ export default function NewTrip({
           </div>
           <datalist id="locations">
             {[
+              "Centennial Hills",
+              "North Las Vegas",
+              "Henderson",
+              "Southern Highlands",
+              "Mountain's Edge",
+              "Spring Valley",
+              "Summerlin",
               "Bellagio",
               "MGM Grand",
               "Wynn Las Vegas",
@@ -144,10 +151,12 @@ export default function NewTrip({
             Assign vehicle
             <select name="vehicle">
               {fleet
-                .filter((v) => v.status === "Available")
+                .filter(
+                  (v) => fleetSnapshot(v, FLEET_EVENING).status === "Available",
+                )
                 .map((v) => (
                   <option key={v.id} value={v.id}>
-                    {v.id} · {v.name} · {v.capacity} seats
+                    {v.name} · {v.capacity} seats
                   </option>
                 ))}
             </select>
