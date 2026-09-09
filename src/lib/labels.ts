@@ -11,13 +11,12 @@ export function spreadOverlappingLabels(
       for (let j = i + 1; j < points.length; j++) {
         const a = points[i],
           b = points[j];
-        const dx =
-          a.x + offsets[a.id].dx - (b.x + offsets[b.id].dx);
-        const dy =
-          a.y + offsets[a.id].dy - (b.y + offsets[b.id].dy);
+        const dx = a.x + offsets[a.id].dx - (b.x + offsets[b.id].dx);
+        const dy = a.y + offsets[a.id].dy - (b.y + offsets[b.id].dy);
         const dist = Math.hypot(dx, dy);
         if (dist >= minSep) continue;
-        const angle = dist < 0.4 ? (i * 2.399) / points.length : Math.atan2(dy, dx);
+        const angle =
+          dist < 0.4 ? (i * 2.399) / points.length : Math.atan2(dy, dx);
         const push = (minSep - Math.max(dist, 0.4)) / 2;
         offsets[a.id].dx += Math.cos(angle) * push;
         offsets[a.id].dy += Math.sin(angle) * push;

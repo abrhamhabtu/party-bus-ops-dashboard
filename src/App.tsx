@@ -19,15 +19,32 @@ import {
   Video,
   X,
   Zap,
+  BusFront,
+  Search,
+  Wrench,
+  BarChart3,
 } from "lucide-react";
 import Operations from "./components/Operations";
 import NewTrip from "./components/NewTrip";
 import { initialTrips, readSaved, type Trip } from "./lib/data";
 import "./App.css";
 import "./components/Operations.css";
-type View = "Overview" | "Dispatch" | "Shuttles" | "Drivers" | "Integrations";
+import "./components/Command.css";
+import VerizonSetup from "./components/VerizonSetup";
+import WorkspacePages from "./components/WorkspacePages";
+type View =
+  | "Overview"
+  | "Dispatch"
+  | "Shuttles"
+  | "Drivers"
+  | "Integrations"
+  | "Fleet"
+  | "Cameras"
+  | "Maintenance"
+  | "Reports";
 function App() {
   const [view, setView] = useState<View>("Overview"),
+    [globalQuery, setGlobalQuery] = useState(""),
     [trips, setTrips] = useState<Trip[]>(() =>
       readSaved("vegas-trips", initialTrips),
     ),
@@ -174,6 +191,10 @@ function App() {
             [
               { name: "Overview", icon: LayoutDashboard },
               { name: "Dispatch", icon: CalendarDays },
+              { name: "Fleet", icon: BusFront },
+              { name: "Cameras", icon: Video },
+              { name: "Maintenance", icon: Wrench },
+              { name: "Reports", icon: BarChart3 },
               { name: "Shuttles", icon: Route },
               { name: "Drivers", icon: Users },
               { name: "Integrations", icon: SlidersHorizontal },
@@ -189,7 +210,13 @@ function App() {
               }}
             >
               <n.icon size={20} />
-              <span>{n.name === "Shuttles" ? "Shuttling" : n.name}</span>
+              <span>
+                {n.name === "Shuttles"
+                  ? "Shuttling"
+                  : n.name === "Overview"
+                    ? "Operations"
+                    : n.name}
+              </span>
             </button>
           ))}
         </div>
@@ -200,21 +227,50 @@ function App() {
         >
           <Settings2 size={20} />
         </button>
+        <div className="sidebar-signature">
+          <span>♠</span>
+          <strong>
+            GOOD RIDES.
+            <br />
+            GREAT NIGHTS.
+          </strong>
+          <small>Las Vegas never stops.</small>
+        </div>
         <div className="avatar">AC</div>
       </aside>
       <div className="workspace">
         <header className="topbar">
           <div className="brand">
-            VEGAS<span>CONTROL</span>
-            <span className="brand-divider" />
-            <span className="company">Discreet Transportation</span>
+            <span className="command-logo">
+              V<span>—</span>
+            </span>
+            <div>
+              <strong>
+                VEGAS <span>FLEET COMMAND</span>
+              </strong>
+              <small>DISCREET TRANSPORTATION · LAS VEGAS</small>
+            </div>
           </div>
+          <label className="header-search">
+            <Search size={16} />
+            <input
+              aria-label="Search command center"
+              placeholder="Search vehicles, drivers, or locations…"
+              value={globalQuery}
+              onChange={(e) => {
+                setGlobalQuery(e.target.value);
+                if (view !== "Overview" && view !== "Shuttles")
+                  setView("Overview");
+              }}
+            />
+            <kbd>⌕</kbd>
+          </label>
           <div className="top-actions">
             <span className="demo-tag">
               <i /> DEMO WORKSPACE
             </span>
-            <span className="timezone">
-              Las Vegas, NV <span>· PDT</span>
+            <span className="header-date">
+              <CalendarDays size={14} /> Sep 9, 2026 <small>Demo day</small>
             </span>
             <button
               className="icon-button notification"
@@ -224,7 +280,12 @@ function App() {
               <Bell size={18} />
               {!resolved && <i />}
             </button>
-            <div className="avatar small">AC</div>
+            <div className="operator-profile">
+              <div className="avatar small">AC</div>
+              <span>
+                Fleet manager<small>Operations workspace</small>
+              </span>
+            </div>
           </div>
         </header>
         {view !== "Overview" && view !== "Shuttles" && (
@@ -236,7 +297,9 @@ function App() {
                   ? "Dispatch board"
                   : view === "Drivers"
                     ? "Driver workspace"
-                    : "Connected operations"}
+                    : view === "Integrations"
+                      ? "Connected operations"
+                      : view}
                 <span className="live-pill">
                   <i />
                   Demo workspace
@@ -266,6 +329,20 @@ function App() {
             onMode={(value) => setView(value ? "Shuttles" : "Overview")}
             onNewTrip={() => setModal(true)}
             onIntegrations={() => setView("Integrations")}
+            query={globalQuery}
+            onQuery={setGlobalQuery}
+            onMaintenance={() => setView("Maintenance")}
+          />
+        )}
+        {(view === "Fleet" ||
+          view === "Cameras" ||
+          view === "Maintenance" ||
+          view === "Reports") && (
+          <WorkspacePages
+            view={view}
+            onConnect={() => setView("Integrations")}
+            onNewTrip={() => setView("Dispatch")}
+            onExport={exportTrips}
           />
         )}
         {view === "Dispatch" && (
@@ -426,72 +503,75 @@ function App() {
           </div>
         )}
         {view === "Integrations" && (
-          <div className="integration-grid">
-            {[
-              {
-                name: "Moovs",
-                icon: CalendarDays,
-                tag: "Access to confirm",
-                text: "Bring reservations, passenger counts, and assignments into your dispatch board.",
-                details:
-                  "Moovs lists a Custom API on its pricing page. Your plan, endpoints, and access must be confirmed with Moovs.",
-                url: "https://www.moovsapp.com/pricing",
-              },
-              {
-                name: "Verizon Connect",
-                icon: Video,
-                tag: "Not connected",
-                text: "Pair your fleet positions with vehicle health and safety-event context.",
-                details:
-                  "Reveal offers an API and webhook integration program. Camera-event and footage access depend on your account and permissions.",
-                url: "https://www.verizonconnect.com/services/api-integration/",
-              },
-              {
-                name: "Driver mobile",
-                icon: Smartphone,
-                tag: "Demo available",
-                text: "A practical fallback for vehicles without connected telematics.",
-                details:
-                  "Try shift start and end in the driver workspace. Production background tracking requires a native mobile application.",
-                url: "",
-              },
-            ].map((x) => (
-              <section className="integration-card" key={x.name}>
-                <x.icon size={30} />
-                <span className="integration-tag">{x.tag}</span>
-                <h2>{x.name}</h2>
-                <p>{x.text}</p>
-                <div className="integration-detail">{x.details}</div>
-                {x.url ? (
-                  <a
-                    className="secondary"
-                    href={x.url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Provider information <ArrowUpRight size={15} />
-                  </a>
-                ) : (
-                  <button
-                    className="secondary"
-                    onClick={() => setView("Drivers")}
-                  >
-                    Open driver demo <ArrowRight size={15} />
-                  </button>
-                )}
-              </section>
-            ))}
-            <div className="integration-notice">
-              <ShieldCheck size={20} />
-              <div>
-                <h3>Demo data is isolated from your real business.</h3>
-                <p>
-                  No provider credentials or customer records are connected.
-                  Trip edits are saved in this browser only.
-                </p>
+          <>
+            <VerizonSetup />
+            <div className="integration-grid">
+              {[
+                {
+                  name: "Moovs",
+                  icon: CalendarDays,
+                  tag: "Access to confirm",
+                  text: "Bring reservations, passenger counts, and assignments into your dispatch board.",
+                  details:
+                    "Moovs lists a Custom API on its pricing page. Your plan, endpoints, and access must be confirmed with Moovs.",
+                  url: "https://www.moovsapp.com/pricing",
+                },
+                {
+                  name: "Verizon Connect",
+                  icon: Video,
+                  tag: "Not connected",
+                  text: "Pair your fleet positions with vehicle health and safety-event context.",
+                  details:
+                    "Reveal offers an API and webhook integration program. Camera-event and footage access depend on your account and permissions.",
+                  url: "https://www.verizonconnect.com/services/api-integration/",
+                },
+                {
+                  name: "Driver mobile",
+                  icon: Smartphone,
+                  tag: "Demo available",
+                  text: "A practical fallback for vehicles without connected telematics.",
+                  details:
+                    "Try shift start and end in the driver workspace. Production background tracking requires a native mobile application.",
+                  url: "",
+                },
+              ].map((x) => (
+                <section className="integration-card" key={x.name}>
+                  <x.icon size={30} />
+                  <span className="integration-tag">{x.tag}</span>
+                  <h2>{x.name}</h2>
+                  <p>{x.text}</p>
+                  <div className="integration-detail">{x.details}</div>
+                  {x.url ? (
+                    <a
+                      className="secondary"
+                      href={x.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Provider information <ArrowUpRight size={15} />
+                    </a>
+                  ) : (
+                    <button
+                      className="secondary"
+                      onClick={() => setView("Drivers")}
+                    >
+                      Open driver demo <ArrowRight size={15} />
+                    </button>
+                  )}
+                </section>
+              ))}
+              <div className="integration-notice">
+                <ShieldCheck size={20} />
+                <div>
+                  <h3>Demo data is isolated from your real business.</h3>
+                  <p>
+                    No provider credentials or customer records are connected.
+                    Trip edits are saved in this browser only.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          </>
         )}
         {view !== "Overview" && view !== "Shuttles" && (
           <footer className="footer">

@@ -26,10 +26,17 @@ import {
   Users,
   Video,
   X,
+  Moon,
 } from "lucide-react";
+import CommandOverview from "./CommandOverview";
 import type { MapVehicle } from "./FleetMap";
 const FleetMap = lazy(() => import("./FleetMap"));
-import { fleet, fleetSnapshot, FLEET_DAY_MINUTES, FLEET_EVENING } from "../lib/data";
+import {
+  fleet,
+  fleetSnapshot,
+  FLEET_DAY_MINUTES,
+  FLEET_EVENING,
+} from "../lib/data";
 import { isNightOps } from "../lib/map/cameras";
 import {
   atStation,
@@ -103,20 +110,27 @@ export default function Operations({
   onMode,
   onNewTrip,
   onIntegrations,
+  query,
+  onQuery,
+  onMaintenance,
 }: {
   shuttle: boolean;
   onMode: (shuttle: boolean) => void;
   onNewTrip: () => void;
   onIntegrations: () => void;
+  query: string;
+  onQuery: (query: string) => void;
+  onMaintenance: () => void;
 }) {
   const [selected, setSelected] = useState<string | null>(null),
-    [query, setQuery] = useState(""),
     [filter, setFilter] = useState("All"),
     [perspective, setPerspective] = useState(true),
     [showLayers, setShowLayers] = useState(false),
     [showArea, setShowArea] = useState(true),
     [showVehicles, setShowVehicles] = useState(true),
     [showBuildings, setShowBuildings] = useState(true),
+    [showLandmarks, setShowLandmarks] = useState(true),
+    [showZones, setShowZones] = useState(true),
     [command, setCommand] = useState({ kind: "", id: 0 }),
     [playing, setPlaying] = useState(false),
     [fleetMinute, setFleetMinute] = useState(FLEET_EVENING),
@@ -132,24 +146,28 @@ export default function Operations({
     [travelBuffer, setTravelBuffer] = useState(5),
     [dwellLimit, setDwellLimit] = useState(10),
     [note, setNote] = useState("");
+  const setQuery = onQuery;
   const minute = shuttle ? shuttleMinute : fleetMinute;
   useEffect(() => {
     if (!playing) return;
-    const timer = setInterval(() => {
-      if (shuttle) {
-        setShuttleMinute((v) => {
-          const next = v + 0.5;
-          if (next >= SESSION_START + 15)
-            return hasRecordedEvents ? SESSION_START + 15 : SESSION_START;
-          return next;
-        });
-      } else {
-        setFleetMinute((v) => {
-          const next = v + 8;
-          return next >= FLEET_DAY_MINUTES ? 0 : next;
-        });
-      }
-    }, shuttle ? 250 : 180);
+    const timer = setInterval(
+      () => {
+        if (shuttle) {
+          setShuttleMinute((v) => {
+            const next = v + 0.5;
+            if (next >= SESSION_START + 15)
+              return hasRecordedEvents ? SESSION_START + 15 : SESSION_START;
+            return next;
+          });
+        } else {
+          setFleetMinute((v) => {
+            const next = v + 8;
+            return next >= FLEET_DAY_MINUTES ? 0 : next;
+          });
+        }
+      },
+      shuttle ? 250 : 180,
+    );
     return () => clearInterval(timer);
   }, [playing, shuttle, hasRecordedEvents]);
   useEffect(() => {
@@ -184,21 +202,28 @@ export default function Operations({
   const queued = shuttles.filter((v) => atStation(v, station));
   const activeShuttle = shuttles.find((v) => v.id === selected),
     activeFleet = fleet.find((v) => v.id === selected);
-  const fleetLive = fleet.map((v) => ({
-    v,
-    snap: fleetSnapshot(v, fleetMinute),
-  }));
+  const fleetLive = useMemo(
+    () =>
+      fleet.map((v) => ({
+        v,
+        snap: fleetSnapshot(v, fleetMinute),
+      })),
+    [fleetMinute],
+  );
+  const dockExpanded = expanded || !!query;
   const activeSnap = fleetLive.find((item) => item.v.id === selected)?.snap;
   const visibleFleet = fleetLive.filter(
     ({ v, snap }) =>
-      `${v.name} ${v.id} ${v.driver}`
+      `${v.name} ${v.id} ${v.driver} ${snap.area} ${snap.destination}`
         .toLowerCase()
         .includes(query.toLowerCase()) &&
       (filter === "All" || snap.status === filter),
   );
   const visibleShuttles = routeVehicles.filter(
     (v) =>
-      `${v.id} ${v.name} ${v.driver}`.toLowerCase().includes(query.toLowerCase()) &&
+      `${v.id} ${v.name} ${v.driver}`
+        .toLowerCase()
+        .includes(query.toLowerCase()) &&
       (filter === "All" ||
         (filter === "Needs review" && !!timing(v).attention) ||
         (filter === "Inbound" && inboundTo(v, station)) ||
@@ -234,7 +259,7 @@ export default function Operations({
               name: v.name,
               driver: v.driver,
               coordinates: snap.coordinates,
-              color: v.color,
+              color: snap.status === "Available" ? "#ffc65b" : "#36d5ff",
               heading: 0,
             })),
     [shuttle, shuttles, minute, runs, fleetLive],
@@ -260,6 +285,27 @@ export default function Operations({
     setRuns(completedRuns);
     setHasRecordedEvents(false);
     setNote("Example shift restored.");
+  }
+  function loadDemoScene(scene: string) {
+    if (!scene) return;
+    reset();
+    setQuery("");
+    setFilter("All");
+    setHotel("venetian");
+    setStation("t1");
+    const isShuttle = scene === "airport" || scene === "review";
+    onMode(isShuttle);
+    setFleetMinute(scene === "day" ? 12 * 60 : FLEET_EVENING);
+    const delayed = shuttleFleet.find((v) => v.name === "Bankroll");
+    setSelected(scene === "review" ? (delayed?.id ?? null) : null);
+    setExpanded(scene === "review");
+    setPlaying(scene !== "review");
+    mapCommand("reset");
+    setNote(
+      scene === "review"
+        ? "Demo delay review: inspect the current leg and compare it with the route average."
+        : "Demo running. Select a bus for details, or pause and scrub the replay.",
+    );
   }
   function advance(v: ShuttleVehicle) {
     if (timing(v).stale) {
@@ -359,6 +405,8 @@ export default function Operations({
           showArea={showArea}
           showVehicles={showVehicles}
           showBuildings={showBuildings}
+          showLandmarks={showLandmarks}
+          showZones={showZones}
           perspective={perspective}
           minute={fleetMinute}
           command={command}
@@ -378,7 +426,11 @@ export default function Operations({
         >
           <MapPin size={15} />
           <span>
-            {shuttle ? "Airport loop" : isNightOps(fleetMinute) ? "Night corridor" : "Valley"}
+            {shuttle
+              ? "Airport loop"
+              : isNightOps(fleetMinute)
+                ? "Night corridor"
+                : "Valley"}
             <small>
               {shuttle
                 ? "T1 / T3 · Strip"
@@ -406,6 +458,20 @@ export default function Operations({
           </button>
         </div>
         <div className="map-toolbar-end">
+          <select
+            className="demo-scene-select"
+            aria-label="Load demo scene"
+            value=""
+            onChange={(e) => loadDemoScene(e.target.value)}
+          >
+            <option value="" disabled>
+              Demo scenes
+            </option>
+            <option value="day">Daytime fleet</option>
+            <option value="night">Strip at night</option>
+            <option value="airport">Airport shuttling</option>
+            <option value="review">Delayed shuttle review</option>
+          </select>
           <span className="simulation-indicator">
             <i />
             {playing ? "Demo running" : "Demo paused"}
@@ -432,6 +498,16 @@ export default function Operations({
               set: setShowVehicles,
             },
             {
+              label: "Vegas landmarks",
+              value: showLandmarks,
+              set: setShowLandmarks,
+            },
+            {
+              label: "Demo activity zones",
+              value: showZones,
+              set: setShowZones,
+            },
+            {
               label: "3D buildings",
               value: showBuildings,
               set: setShowBuildings,
@@ -447,6 +523,16 @@ export default function Operations({
             </label>
           ))}
           <small>Buildings appear as you zoom in.</small>
+        </div>
+      )}
+      {!shuttle && (
+        <div className="weather-overlay">
+          <Moon size={29} />
+          <div>
+            <strong>Night operations</strong>
+            <span>Strip & downtown corridor</span>
+            <small>Simulation · not live weather</small>
+          </div>
         </div>
       )}
       <div className="geographic-title">
@@ -501,8 +587,8 @@ export default function Operations({
               ["#84909e", "GPS stale"],
             ]
           : [
-              ["#e2c48a", "On trip"],
-              ["#9ad0c6", "Available"],
+              ["#36d5ff", "On trip"],
+              ["#ffc65b", "Available"],
               ["#d7b48a", "To pickup"],
             ]
         ).map(([color, label]) => (
@@ -538,420 +624,442 @@ export default function Operations({
           <Minus size={18} />
         </button>
       </div>
-      <aside className="telemetry-panel">
-        <div className="telemetry-heading">
-          <div>
-            <span className="micro-label">
-              {shuttle ? "ROUTE INTELLIGENCE" : "OPERATIONS"}
-            </span>
-            <h2>{shuttle ? "Airport transfer" : "Fleet at a glance"}</h2>
-          </div>
-          <button
-            aria-label="Timing settings"
-            className={"quiet-button " + (settings ? "engaged" : "")}
-            onClick={() => setSettings(!settings)}
-          >
-            <Settings2 size={16} />
-          </button>
-        </div>
-        {shuttle && (
-          <label className="route-select">
-            <Route size={15} />
-            <select
-              aria-label="Shuttle route"
-              value={hotel}
-              onChange={(e) => {
-                const h = e.target.value as Hotel;
-                setHotel(h);
-                setSelected(null);
-                setFilter("All");
-                if (!isAirport(station)) setStation(h);
-              }}
+      {!shuttle ? (
+        <CommandOverview
+          minute={fleetMinute}
+          onConnect={onIntegrations}
+          onReview={onMaintenance}
+          onFleet={() => setExpanded(true)}
+        />
+      ) : (
+        <aside className="telemetry-panel">
+          <div className="telemetry-heading">
+            <div>
+              <span className="micro-label">
+                {shuttle ? "ROUTE INTELLIGENCE" : "OPERATIONS"}
+              </span>
+              <h2>{shuttle ? "Airport transfer" : "Fleet at a glance"}</h2>
+            </div>
+            <button
+              aria-label="Timing settings"
+              className={"quiet-button " + (settings ? "engaged" : "")}
+              onClick={() => setSettings(!settings)}
             >
-              <option value="venetian">T1 / T3 ↔ The Venetian</option>
-              <option value="virgin">T3 ↔ Virgin Hotels</option>
-            </select>
-          </label>
-        )}
-        {settings && (
-          <div className="timing-settings">
-            <strong>Review thresholds</strong>
-            <label>
-              Travel over route average{" "}
-              <span>
-                <input
-                  aria-label="Travel delay tolerance"
-                  type="number"
-                  min={1}
-                  max={30}
-                  value={travelBuffer}
-                  onChange={(e) =>
-                    setTravelBuffer(
-                      Math.max(1, Math.min(30, Number(e.target.value))),
-                    )
-                  }
-                />{" "}
-                min
-              </span>
-            </label>
-            <label>
-              Time at loading stop{" "}
-              <span>
-                <input
-                  aria-label="Loading time threshold"
-                  type="number"
-                  min={1}
-                  max={60}
-                  value={dwellLimit}
-                  onChange={(e) =>
-                    setDwellLimit(
-                      Math.max(1, Math.min(60, Number(e.target.value))),
-                    )
-                  }
-                />{" "}
-                min
-              </span>
-            </label>
-            <p>
-              Review flags indicate elapsed time, not fault. GPS older than 2
-              min is marked stale.
-            </p>
+              <Settings2 size={16} />
+            </button>
           </div>
-        )}
-        <div className="telemetry-grid">
-          {shuttle ? (
-            <>
-              <MiniStat
-                label="Airport → hotel"
-                value={stats.outbound ?? "—"}
-                unit="min"
-                detail="Avg. completed outbound"
-              />
-              <MiniStat
-                label="Hotel → airport"
-                value={stats.return ?? "—"}
-                unit="min"
-                detail="Avg. completed return"
-              />
-              <MiniStat
-                label="Round trip"
-                value={stats.roundTrip ?? "—"}
-                unit="min"
-                detail="Includes hotel turnaround"
-              />
-              <MiniStat
-                label="Active vehicles"
-                value={routeVehicles.length}
-                unit="on route"
-                detail={`${stats.completed} completed cycles`}
-              />
-              <MiniStat
-                label="At your stop"
-                value={queued.length}
-                unit="vehicles"
-                detail={stations[station].short}
-              />
-              <MiniStat
-                label="Needs review"
-                value={reviewVehicles.length}
-                unit="vehicles"
-                detail="Travel, loading or GPS"
-                warn={reviewVehicles.length > 0}
-              />
-            </>
-          ) : (
-            <>
-              <MiniStat
-                label="Fleet size"
-                value={fleet.length}
-                unit="vehicles"
-              />
-              <MiniStat
-                label="On the road"
-                value={fleetLive.filter(({ snap }) => snap.status !== "Offline").length}
-                unit="online"
-              />
-              <MiniStat
-                label="Passengers"
-                value={fleetLive.reduce((a, { snap }) => a + snap.passengers, 0)}
-                unit="on board"
-              />
-              <MiniStat
-                label="Available"
-                value={fleetLive.filter(({ snap }) => snap.status === "Available").length}
-                unit="vehicles"
-              />
-              <MiniStat
-                label="To pickup"
-                value={fleetLive.filter(({ snap }) => snap.status === "To pickup").length}
-                unit="vehicles"
-              />
-              <MiniStat
-                label="Maintenance"
-                value={fleetLive.filter(({ snap }) => snap.status === "Offline").length}
-                unit="offline"
-                warn
-              />
-            </>
-          )}
-        </div>
-        <section className="route-performance">
-          {shuttle ? (
-            <>
-              <div className="section-heading">
-                <h3>Trip performance</h3>
-                <small>
-                  {board.dropOffs} drop-offs · {board.milesDriven} mi
-                </small>
-              </div>
-              <div
-                className="rotation-board"
-                aria-label="Airport to hotel rotation"
+          {shuttle && (
+            <label className="route-select">
+              <Route size={15} />
+              <select
+                aria-label="Shuttle route"
+                value={hotel}
+                onChange={(e) => {
+                  const h = e.target.value as Hotel;
+                  setHotel(h);
+                  setSelected(null);
+                  setFilter("All");
+                  if (!isAirport(station)) setStation(h);
+                }}
               >
-                <div className="rotation-stop">
-                  <b>{board.airport}</b>
-                  <small>Airport</small>
-                </div>
-                <div className="rotation-leg">
-                  <em>{board.outbound ?? "—"} min</em>
-                  <span />
-                  <small>{board.oneWayMiles} mi out</small>
-                </div>
-                <div className="rotation-stop hotel">
-                  <b>{board.hotelName}</b>
+                <option value="venetian">T1 / T3 ↔ The Venetian</option>
+                <option value="virgin">T3 ↔ Virgin Hotels</option>
+              </select>
+            </label>
+          )}
+          {settings && (
+            <div className="timing-settings">
+              <strong>Review thresholds</strong>
+              <label>
+                Travel over route average{" "}
+                <span>
+                  <input
+                    aria-label="Travel delay tolerance"
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={travelBuffer}
+                    onChange={(e) =>
+                      setTravelBuffer(
+                        Math.max(1, Math.min(30, Number(e.target.value))),
+                      )
+                    }
+                  />{" "}
+                  min
+                </span>
+              </label>
+              <label>
+                Time at loading stop{" "}
+                <span>
+                  <input
+                    aria-label="Loading time threshold"
+                    type="number"
+                    min={1}
+                    max={60}
+                    value={dwellLimit}
+                    onChange={(e) =>
+                      setDwellLimit(
+                        Math.max(1, Math.min(60, Number(e.target.value))),
+                      )
+                    }
+                  />{" "}
+                  min
+                </span>
+              </label>
+              <p>
+                Review flags indicate elapsed time, not fault. GPS older than 2
+                min is marked stale.
+              </p>
+            </div>
+          )}
+          <div className="telemetry-grid">
+            {shuttle ? (
+              <>
+                <MiniStat
+                  label="Airport → hotel"
+                  value={stats.outbound ?? "—"}
+                  unit="min"
+                  detail="Avg. completed outbound"
+                />
+                <MiniStat
+                  label="Hotel → airport"
+                  value={stats.return ?? "—"}
+                  unit="min"
+                  detail="Avg. completed return"
+                />
+                <MiniStat
+                  label="Round trip"
+                  value={stats.roundTrip ?? "—"}
+                  unit="min"
+                  detail="Includes hotel turnaround"
+                />
+                <MiniStat
+                  label="Active vehicles"
+                  value={routeVehicles.length}
+                  unit="on route"
+                  detail={`${stats.completed} completed cycles`}
+                />
+                <MiniStat
+                  label="At your stop"
+                  value={queued.length}
+                  unit="vehicles"
+                  detail={stations[station].short}
+                />
+                <MiniStat
+                  label="Needs review"
+                  value={reviewVehicles.length}
+                  unit="vehicles"
+                  detail="Travel, loading or GPS"
+                  warn={reviewVehicles.length > 0}
+                />
+              </>
+            ) : (
+              <>
+                <MiniStat
+                  label="Fleet size"
+                  value={fleet.length}
+                  unit="vehicles"
+                />
+                <MiniStat
+                  label="On the road"
+                  value={
+                    fleetLive.filter(({ snap }) => snap.status !== "Offline")
+                      .length
+                  }
+                  unit="online"
+                />
+                <MiniStat
+                  label="Passengers"
+                  value={fleetLive.reduce(
+                    (a, { snap }) => a + snap.passengers,
+                    0,
+                  )}
+                  unit="on board"
+                />
+                <MiniStat
+                  label="Available"
+                  value={
+                    fleetLive.filter(({ snap }) => snap.status === "Available")
+                      .length
+                  }
+                  unit="vehicles"
+                />
+                <MiniStat
+                  label="To pickup"
+                  value={
+                    fleetLive.filter(({ snap }) => snap.status === "To pickup")
+                      .length
+                  }
+                  unit="vehicles"
+                />
+                <MiniStat
+                  label="Maintenance"
+                  value={
+                    fleetLive.filter(({ snap }) => snap.status === "Offline")
+                      .length
+                  }
+                  unit="offline"
+                  warn
+                />
+              </>
+            )}
+          </div>
+          <section className="route-performance">
+            {shuttle ? (
+              <>
+                <div className="section-heading">
+                  <h3>Trip performance</h3>
                   <small>
-                    Drop-off · {board.dwell ?? "—"} min turn
+                    {board.dropOffs} drop-offs · {board.milesDriven} mi
                   </small>
                 </div>
-                <div className="rotation-leg return">
-                  <em>{board.return ?? "—"} min</em>
-                  <span />
-                  <small>{board.oneWayMiles} mi back</small>
-                </div>
-                <div className="rotation-stop">
-                  <b>{board.airport}</b>
-                  <small>Airport</small>
-                </div>
-              </div>
-              <div className="rotation-totals">
-                <div>
-                  <strong>{board.roundTrip ?? "—"}</strong>
-                  <span>min cycle</span>
-                </div>
-                <div>
-                  <strong>{board.roundMiles}</strong>
-                  <span>mi round</span>
-                </div>
-                <div>
-                  <strong>{board.milesDriven}</strong>
-                  <span>Miles tonight</span>
-                </div>
-                <div>
-                  <strong>{board.dropOffs}</strong>
-                  <span>Hotel drop-offs</span>
-                </div>
-                <div>
-                  <strong>{board.guests}</strong>
-                  <span>guests moved</span>
-                </div>
-              </div>
-              <ul className="driver-rotations">
-                {routeVehicles.slice(0, 5).map((v) => {
-                  const row = driverRotation(v, minute, runs);
-                  const denom = Math.max(1, row.expected ?? 20);
-                  const pct = Math.min(100, (row.elapsed / denom) * 100);
-                  return (
-                    <li key={v.id}>
-                      <button
-                        className={selected === v.id ? "selected" : ""}
-                        aria-label={`${row.driver} · ${row.name}`}
-                        onClick={() => setSelected(v.id)}
-                      >
-                        <span>
-                          <strong>{row.driver}</strong>
-                          <small>
-                            {row.name} · {phaseLabel(v)}
-                          </small>
-                        </span>
-                        <b>
-                          {row.elapsed} / {row.expected ?? "—"} min
-                          <small>
-                            {row.miles} mi
-                            {row.guests ? ` · ${row.guests} on board` : ""}
-                          </small>
-                        </b>
-                        <i
-                          className={row.attention ? "late" : ""}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </>
-          ) : (
-            <>
-              <div className="section-heading">
-                <h3>Shuttle performance</h3>
-                <div className="chart-toggle">
-                  <button
-                    className={chartMode === "legs" ? "active" : ""}
-                    onClick={() => setChartMode("legs")}
-                  >
-                    One way
-                  </button>
-                  <button
-                    className={chartMode === "cycles" ? "active" : ""}
-                    onClick={() => setChartMode("cycles")}
-                  >
-                    Round trip
-                  </button>
-                </div>
-              </div>
-              <div
-                className="performance-chart"
-                aria-label={`${chartMode === "legs" ? "One-way" : "Round-trip"} duration chart`}
-              >
-                <div className="chart-axis">
-                  <span>{chartMode === "legs" ? "30" : "60"}</span>
-                  <span>{chartMode === "legs" ? "15" : "30"}</span>
-                  <span>0 min</span>
-                </div>
-                <div className="duration-bars">
-                  {chartRuns.map((r, i) => (
-                    <div
-                      className="bar-group"
-                      key={r.id}
-                      title={`Run ${i + 1}: outbound ${r.hotelArrival - r.depart} min, return ${r.airportReturn! - r.hotelDepart} min, round trip ${r.airportReturn! - r.depart} min`}
-                    >
-                      {chartMode === "legs" ? (
-                        <>
-                          <i
-                            className="outbound-bar"
-                            style={{
-                              height: `${((r.hotelArrival - r.depart) / 30) * 100}%`,
-                            }}
-                          />
-                          <i
-                            className="return-bar"
-                            style={{
-                              height: `${((r.airportReturn! - r.hotelDepart) / 30) * 100}%`,
-                            }}
-                          />
-                        </>
-                      ) : (
-                        <i
-                          className="cycle-bar"
-                          style={{
-                            height: `${Math.min(100, ((r.airportReturn! - r.depart) / 60) * 100)}%`,
-                          }}
-                        />
-                      )}
-                      <small>{String(i + 1).padStart(2, "0")}</small>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="performance-key">
-                {chartMode === "legs" ? (
-                  <>
-                    <span>
-                      <i />
-                      To hotel
-                    </span>
-                    <span>
-                      <i />
-                      To airport
-                    </span>
-                  </>
-                ) : (
-                  <span>
-                    <i />
-                    Full cycle incl. hotel stop
-                  </span>
-                )}
-                <small>{chartRuns.length} completed · demo</small>
-              </div>
-            </>
-          )}
-        </section>
-        {shuttle ? (
-          <section className="arrivals-panel">
-            <div className="section-heading">
-              <h3>
-                Inbound to{" "}
-                {station === "t1"
-                  ? "T1 ground"
-                  : station === "t3"
-                    ? "T3 ground"
-                    : station === "venetian"
-                      ? "Venetian"
-                      : "Virgin"}
-              </h3>
-              <span className="tiny-count">{inbound.length}</span>
-            </div>
-            {inbound.length ? (
-              inbound.slice(0, 3).map((v) => (
-                <button
-                  key={v.id}
-                  className="arrival-row"
-                  onClick={() => setSelected(v.id)}
+                <div
+                  className="rotation-board"
+                  aria-label="Airport to hotel rotation"
                 >
-                  <span className="arrival-icon">
-                    <ArrowDownLeft size={16} />
-                  </span>
+                  <div className="rotation-stop">
+                    <b>{board.airport}</b>
+                    <small>Airport</small>
+                  </div>
+                  <div className="rotation-leg">
+                    <em>{board.outbound ?? "—"} min</em>
+                    <span />
+                    <small>{board.oneWayMiles} mi out</small>
+                  </div>
+                  <div className="rotation-stop hotel">
+                    <b>{board.hotelName}</b>
+                    <small>Drop-off · {board.dwell ?? "—"} min turn</small>
+                  </div>
+                  <div className="rotation-leg return">
+                    <em>{board.return ?? "—"} min</em>
+                    <span />
+                    <small>{board.oneWayMiles} mi back</small>
+                  </div>
+                  <div className="rotation-stop">
+                    <b>{board.airport}</b>
+                    <small>Airport</small>
+                  </div>
+                </div>
+                <div className="rotation-totals">
+                  <div>
+                    <strong>{board.roundTrip ?? "—"}</strong>
+                    <span>min cycle</span>
+                  </div>
+                  <div>
+                    <strong>{board.roundMiles}</strong>
+                    <span>mi round</span>
+                  </div>
+                  <div>
+                    <strong>{board.milesDriven}</strong>
+                    <span>Miles tonight</span>
+                  </div>
+                  <div>
+                    <strong>{board.dropOffs}</strong>
+                    <span>Hotel drop-offs</span>
+                  </div>
+                  <div>
+                    <strong>{board.guests}</strong>
+                    <span>guests moved</span>
+                  </div>
+                </div>
+                <ul className="driver-rotations">
+                  {routeVehicles.slice(0, 5).map((v) => {
+                    const row = driverRotation(v, minute, runs);
+                    const denom = Math.max(1, row.expected ?? 20);
+                    const pct = Math.min(100, (row.elapsed / denom) * 100);
+                    return (
+                      <li key={v.id}>
+                        <button
+                          className={selected === v.id ? "selected" : ""}
+                          aria-label={`${row.driver} · ${row.name}`}
+                          onClick={() => setSelected(v.id)}
+                        >
+                          <span>
+                            <strong>{row.driver}</strong>
+                            <small>
+                              {row.name} · {phaseLabel(v)}
+                            </small>
+                          </span>
+                          <b>
+                            {row.elapsed} / {row.expected ?? "—"} min
+                            <small>
+                              {row.miles} mi
+                              {row.guests ? ` · ${row.guests} on board` : ""}
+                            </small>
+                          </b>
+                          <i
+                            className={row.attention ? "late" : ""}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            ) : (
+              <>
+                <div className="section-heading">
+                  <h3>Shuttle performance</h3>
+                  <div className="chart-toggle">
+                    <button
+                      className={chartMode === "legs" ? "active" : ""}
+                      onClick={() => setChartMode("legs")}
+                    >
+                      One way
+                    </button>
+                    <button
+                      className={chartMode === "cycles" ? "active" : ""}
+                      onClick={() => setChartMode("cycles")}
+                    >
+                      Round trip
+                    </button>
+                  </div>
+                </div>
+                <div
+                  className="performance-chart"
+                  aria-label={`${chartMode === "legs" ? "One-way" : "Round-trip"} duration chart`}
+                >
+                  <div className="chart-axis">
+                    <span>{chartMode === "legs" ? "30" : "60"}</span>
+                    <span>{chartMode === "legs" ? "15" : "30"}</span>
+                    <span>0 min</span>
+                  </div>
+                  <div className="duration-bars">
+                    {chartRuns.map((r, i) => (
+                      <div
+                        className="bar-group"
+                        key={r.id}
+                        title={`Run ${i + 1}: outbound ${r.hotelArrival - r.depart} min, return ${r.airportReturn! - r.hotelDepart} min, round trip ${r.airportReturn! - r.depart} min`}
+                      >
+                        {chartMode === "legs" ? (
+                          <>
+                            <i
+                              className="outbound-bar"
+                              style={{
+                                height: `${((r.hotelArrival - r.depart) / 30) * 100}%`,
+                              }}
+                            />
+                            <i
+                              className="return-bar"
+                              style={{
+                                height: `${((r.airportReturn! - r.hotelDepart) / 30) * 100}%`,
+                              }}
+                            />
+                          </>
+                        ) : (
+                          <i
+                            className="cycle-bar"
+                            style={{
+                              height: `${Math.min(100, ((r.airportReturn! - r.depart) / 60) * 100)}%`,
+                            }}
+                          />
+                        )}
+                        <small>{String(i + 1).padStart(2, "0")}</small>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="performance-key">
+                  {chartMode === "legs" ? (
+                    <>
+                      <span>
+                        <i />
+                        To hotel
+                      </span>
+                      <span>
+                        <i />
+                        To airport
+                      </span>
+                    </>
+                  ) : (
+                    <span>
+                      <i />
+                      Full cycle incl. hotel stop
+                    </span>
+                  )}
+                  <small>{chartRuns.length} completed · demo</small>
+                </div>
+              </>
+            )}
+          </section>
+          {shuttle ? (
+            <section className="arrivals-panel">
+              <div className="section-heading">
+                <h3>
+                  Inbound to{" "}
+                  {station === "t1"
+                    ? "T1 ground"
+                    : station === "t3"
+                      ? "T3 ground"
+                      : station === "venetian"
+                        ? "Venetian"
+                        : "Virgin"}
+                </h3>
+                <span className="tiny-count">{inbound.length}</span>
+              </div>
+              {inbound.length ? (
+                inbound.slice(0, 3).map((v) => (
+                  <button
+                    key={v.id}
+                    className="arrival-row"
+                    onClick={() => setSelected(v.id)}
+                  >
+                    <span className="arrival-icon">
+                      <ArrowDownLeft size={16} />
+                    </span>
+                    <span>
+                      <strong>{v.driver}</strong>
+                      <small>
+                        {v.name} · {phaseLabel(v)}
+                      </small>
+                    </span>
+                    <b className={timing(v).stale ? "muted" : ""}>
+                      {timing(v).stale ? "GPS stale" : `${timing(v).eta} min`}
+                    </b>
+                  </button>
+                ))
+              ) : (
+                <p className="no-arrivals">
+                  No vehicles inbound. Check vehicles at the stop below.
+                </p>
+              )}
+              <div className="arrival-footnote">
+                <Signal size={12} /> ETAs are illustrative in this demo.
+              </div>
+            </section>
+          ) : (
+            <section className="coverage-panel">
+              <div className="section-heading">
+                <h3>Operating hubs</h3>
+                <span>4 locations</span>
+              </div>
+              {(["t1", "t3", "venetian", "virgin"] as Station[]).map((s, i) => (
+                <button key={s} onClick={() => mapCommand(s)}>
+                  <span className="hub-index">0{i + 1}</span>
                   <span>
-                    <strong>{v.driver}</strong>
+                    {stations[s].short}
                     <small>
-                      {v.name} · {phaseLabel(v)}
+                      {isAirport(s)
+                        ? "Airport ground transportation"
+                        : "Hotel pickup & drop-off"}
                     </small>
                   </span>
-                  <b className={timing(v).stale ? "muted" : ""}>
-                    {timing(v).stale ? "GPS stale" : `${timing(v).eta} min`}
-                  </b>
+                  <ArrowUpRight size={14} />
                 </button>
-              ))
-            ) : (
-              <p className="no-arrivals">
-                No vehicles inbound. Check vehicles at the stop below.
-              </p>
-            )}
-            <div className="arrival-footnote">
-              <Signal size={12} /> ETAs are illustrative in this demo.
-            </div>
-          </section>
-        ) : (
-          <section className="coverage-panel">
-            <div className="section-heading">
-              <h3>Operating hubs</h3>
-              <span>4 locations</span>
-            </div>
-            {(["t1", "t3", "venetian", "virgin"] as Station[]).map((s, i) => (
-              <button key={s} onClick={() => mapCommand(s)}>
-                <span className="hub-index">0{i + 1}</span>
-                <span>
-                  {stations[s].short}
-                  <small>
-                    {isAirport(s)
-                      ? "Airport ground transportation"
-                      : "Hotel pickup & drop-off"}
-                  </small>
-                </span>
-                <ArrowUpRight size={14} />
-              </button>
-            ))}
-          </section>
-        )}
-        <div className="provider-footer">
-          <span>
-            <i /> Verizon Connect
-          </span>
-          <button onClick={onIntegrations}>
-            Not connected <ArrowUpRight size={11} />
-          </button>
-        </div>
-      </aside>
+              ))}
+            </section>
+          )}
+          <div className="provider-footer">
+            <span>
+              <i /> Verizon Connect
+            </span>
+            <button onClick={onIntegrations}>
+              Not connected <ArrowUpRight size={11} />
+            </button>
+          </div>
+        </aside>
+      )}
       {selected && (activeFleet || activeShuttle) && (
         <section
           className="vehicle-inspector"
@@ -1103,17 +1211,17 @@ export default function Operations({
           </button>
         </section>
       )}
-      <section className={"fleet-dock " + (expanded ? "expanded" : "")}>
+      <section className={"fleet-dock " + (dockExpanded ? "expanded" : "")}>
         <div className="dock-heading">
           <button
             className="dock-title"
             onClick={() => setExpanded(!expanded)}
-            aria-expanded={expanded}
+            aria-expanded={dockExpanded}
           >
             <BusFront size={16} />
             {shuttle ? "Shuttle vehicles" : "Vehicle activity"}
             <span>{shuttle ? routeVehicles.length : fleet.length}</span>
-            {expanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+            {dockExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
           </button>
           <div className="dock-filters">
             {(shuttle

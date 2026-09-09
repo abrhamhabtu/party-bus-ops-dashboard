@@ -13,7 +13,7 @@ export const SHUTTLE_CAMERA: MapCamera = {
 };
 
 export const NIGHT_CORRIDOR_CAMERA: MapCamera = {
-  center: [-115.158, 36.142],
+  center: [-115.158, 36.12],
   zoom: 12.22,
   bearing: -18,
   pitch: 58,

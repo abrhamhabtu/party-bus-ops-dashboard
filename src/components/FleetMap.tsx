@@ -4,6 +4,11 @@ import type { GeoJSONSource, Map as MapInstance } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 maplibregl.setWorkerUrl(workerUrl);
+import {
+  landmarks,
+  landmarkBuildings,
+  landmarkIcon,
+} from "../lib/map/landmarks";
 import { mapStyle } from "../lib/map/style";
 import { spreadOverlappingLabels } from "../lib/labels";
 import { routes, stations, type Hotel, type Station } from "../lib/shuttling";
@@ -32,12 +37,30 @@ type Props = {
   showArea: boolean;
   showVehicles: boolean;
   showBuildings: boolean;
+  showLandmarks: boolean;
+  showZones: boolean;
   perspective: boolean;
   minute: number;
   command: { kind: string; id: number };
 };
 const vis = (on: boolean) => (on ? "visible" : "none");
 const partyBusMark = `<svg width="40" height="26" viewBox="0 0 40 26" fill="none" aria-hidden="true"><path d="M3 11.2L29 2.4L38 8.6L12 18.2Z" fill="currentColor"/><path d="M12 18.2L38 8.6V16.8L12 26Z" fill="currentColor" opacity=".72"/><path d="M3 11.2L12 18.2V26L3 19Z" fill="currentColor" opacity=".48"/><path d="M7.2 11.4L26.8 4.8L30.2 7.1L10.8 14Z" fill="#1b2836"/><path d="M15.6 17.2L20.8 15.2 22.2 16.2 17 18.2Z" fill="#1b2836" opacity=".9"/><path d="M23.2 14.4L28.4 12.4 29.8 13.4 24.6 15.4Z" fill="#1b2836" opacity=".9"/><path d="M33.6 11.2L36.6 13.2" stroke="#f3ead6" stroke-width="1.15" stroke-linecap="round"/><circle cx="16.4" cy="23.6" r="2.15" fill="#101820"/><circle cx="32.2" cy="17.6" r="2.15" fill="#101820"/><circle cx="16.4" cy="23.6" r=".7" fill="#4c5b6a"/><circle cx="32.2" cy="17.6" r=".7" fill="#4c5b6a"/></svg><span></span>`;
+function responsiveCamera(
+  shuttle: boolean,
+  minute: number,
+  perspective: boolean,
+) {
+  const camera = viewCamera(shuttle, minute, perspective);
+  return window.innerWidth <= 760
+    ? {
+        ...camera,
+        zoom: shuttle ? 12.1 : camera.zoom - 0.4,
+        pitch: perspective ? 42 : 0,
+        bearing: perspective ? -12 : 0,
+      }
+    : camera;
+}
+
 export default function FleetMap({
   vehicles,
   selected,
@@ -47,6 +70,8 @@ export default function FleetMap({
   showArea,
   showVehicles,
   showBuildings,
+  showLandmarks,
+  showZones,
   perspective,
   minute,
   command,
@@ -54,10 +79,15 @@ export default function FleetMap({
   const container = useRef<HTMLDivElement>(null),
     map = useRef<MapInstance | null>(null),
     markers = useRef(new Map<string, maplibregl.Marker>()),
+    landmarkMarkers = useRef<maplibregl.Marker[]>([]),
     selectRef = useRef(onSelect);
   const [ready, setReady] = useState(false),
     [failure, setFailure] = useState("");
   const kind = cameraKind(shuttle, minute);
+  const framing = useRef({ shuttle, minute, perspective });
+  useEffect(() => {
+    framing.current = { shuttle, minute, perspective };
+  }, [shuttle, minute, perspective]);
   useEffect(() => {
     selectRef.current = onSelect;
   }, [onSelect]);
@@ -65,7 +95,8 @@ export default function FleetMap({
     if (!container.current) return;
     let m: MapInstance;
     try {
-      const start = viewCamera(false, 20 * 60 + 18, true);
+      const initial = framing.current;
+      const start = responsiveCamera(initial.shuttle, initial.minute, initial.perspective);
       m = new maplibregl.Map({
         container: container.current,
         style: mapStyle,
@@ -138,16 +169,16 @@ export default function FleetMap({
         id: "corridor-fill",
         source: "night-corridor",
         type: "fill",
-        paint: { "fill-color": "#8ca5bb", "fill-opacity": 0.1 },
+        paint: { "fill-color": "#248cc2", "fill-opacity": 0.07 },
       });
       m.addLayer({
         id: "corridor-outline",
         source: "night-corridor",
         type: "line",
         paint: {
-          "line-color": "#9fb0c0",
-          "line-opacity": 0.55,
-          "line-width": 1.15,
+          "line-color": "#26bff8",
+          "line-opacity": 0.9,
+          "line-width": 1.8,
         },
       });
       m.addSource("shuttle-route", {
@@ -234,7 +265,10 @@ export default function FleetMap({
           features: corridorLandmarks.map((place) => ({
             type: "Feature" as const,
             properties: { name: place.name, id: place.id },
-            geometry: { type: "Point" as const, coordinates: place.coordinates },
+            geometry: {
+              type: "Point" as const,
+              coordinates: place.coordinates,
+            },
           })),
         },
       });
@@ -259,6 +293,90 @@ export default function FleetMap({
           "text-opacity": 0.88,
         },
       });
+      m.addSource("landmark-buildings", {
+        type: "geojson",
+        data: landmarkBuildings(),
+      });
+      m.addLayer({
+        id: "landmark-towers",
+        type: "fill-extrusion",
+        source: "landmark-buildings",
+        paint: {
+          "fill-extrusion-color": "#c49440",
+          "fill-extrusion-height": ["get", "height"],
+          "fill-extrusion-opacity": 0.82,
+        },
+      });
+      m.addSource("activity-zones", {
+        type: "geojson",
+        data: {
+          type: "FeatureCollection",
+          features: landmarks
+            .filter((l) => ["resorts", "venetian", "mgm"].includes(l.id))
+            .map((l) => ({
+              type: "Feature",
+              properties: {},
+              geometry: { type: "Point", coordinates: [...l.coordinates] },
+            })),
+        },
+      });
+      m.addLayer({
+        id: "zone-halo",
+        type: "circle",
+        source: "activity-zones",
+        paint: {
+          "circle-radius": 38,
+          "circle-color": "#9059ff",
+          "circle-opacity": 0.15,
+          "circle-blur": 0.65,
+        },
+      });
+      m.addLayer({
+        id: "zone-core",
+        type: "circle",
+        source: "activity-zones",
+        paint: {
+          "circle-radius": 4,
+          "circle-color": "#b46cff",
+          "circle-opacity": 0.9,
+          "circle-blur": 0.2,
+        },
+      });
+      landmarks.forEach((l) => {
+        const el = document.createElement("button");
+        el.className = "landmark-marker " + l.kind;
+        el.setAttribute("aria-label", "Focus " + l.name);
+        el.innerHTML = landmarkIcon(l.kind) + "<span></span>";
+        el.querySelector("span")!.textContent = l.name;
+        el.addEventListener("click", () =>
+          m.easeTo({ center: [...l.coordinates], zoom: 14.2, duration: 800 }),
+        );
+        const marker = new maplibregl.Marker({
+          element: el,
+          anchor: "bottom-left",
+        })
+          .setLngLat([...l.coordinates])
+          .addTo(m);
+        landmarkMarkers.current.push(marker);
+      });
+      const positionLabels = () => {
+        const boxes: { x: number; y: number }[] = [];
+        landmarks
+          .map((l, i) => ({ l, i }))
+          .sort((a, b) => a.l.priority - b.l.priority)
+          .forEach(({ l, i }) => {
+            const p = m.project([...l.coordinates]);
+            const collides = boxes.some(
+              (b) => Math.abs(b.x - p.x) < 130 && Math.abs(b.y - p.y) < 29,
+            );
+            landmarkMarkers.current[i]
+              ?.getElement()
+              .classList.toggle("compact-landmark", collides);
+            if (!collides) boxes.push(p);
+          });
+      };
+      m.on("move", positionLabels);
+      positionLabels();
       setReady(true);
     });
     m.on("error", (e) => {
@@ -268,13 +386,15 @@ export default function FleetMap({
         );
     });
     const fit = () => {
+      m.stop();
       m.resize();
+      const f = framing.current;
+      m.jumpTo(responsiveCamera(f.shuttle, f.minute, f.perspective));
       m.setPadding({
         top: 40,
-        bottom: window.innerWidth > 760 ? 115 : 35,
+        bottom: window.innerWidth > 760 ? 30 : 20,
         left: 20,
-        right:
-          window.innerWidth > 1100 ? 365 : window.innerWidth > 760 ? 320 : 20,
+        right: 20,
       });
     };
     const observer = new ResizeObserver(fit);
@@ -286,6 +406,8 @@ export default function FleetMap({
       observer.disconnect();
       currentMarkers.forEach((marker) => marker.remove());
       currentMarkers.clear();
+      landmarkMarkers.current.forEach((marker) => marker.remove());
+      landmarkMarkers.current = [];
       m.remove();
       map.current = null;
     };
@@ -293,19 +415,42 @@ export default function FleetMap({
   useEffect(() => {
     const m = map.current;
     if (!ready || !m) return;
-    m.setLayoutProperty("service-fill", "visibility", vis(showArea && !shuttle));
+    m.setLayoutProperty(
+      "service-fill",
+      "visibility",
+      vis(showArea && !shuttle),
+    );
     m.setLayoutProperty(
       "service-outline",
       "visibility",
       vis(showArea && !shuttle),
     );
-    m.setLayoutProperty("corridor-fill", "visibility", vis(!shuttle));
-    m.setLayoutProperty("corridor-outline", "visibility", vis(!shuttle));
+    m.setLayoutProperty(
+      "corridor-fill",
+      "visibility",
+      vis(showArea && !shuttle),
+    );
+    m.setLayoutProperty(
+      "corridor-outline",
+      "visibility",
+      vis(showArea && !shuttle),
+    );
     m.setLayoutProperty("landmark-labels", "visibility", vis(!shuttle));
     m.setLayoutProperty("station-halo", "visibility", vis(shuttle));
     m.setLayoutProperty("station-core", "visibility", vis(shuttle));
     m.setLayoutProperty("station-labels", "visibility", vis(shuttle));
     m.setLayoutProperty("buildings-3d", "visibility", vis(showBuildings));
+    m.setLayoutProperty(
+      "landmark-towers",
+      "visibility",
+      vis(showBuildings && showLandmarks),
+    );
+    m.setLayoutProperty("zone-halo", "visibility", vis(showZones));
+    m.setLayoutProperty("zone-core", "visibility", vis(showZones));
+    landmarkMarkers.current.forEach((marker) => {
+      marker.getElement().style.display = showLandmarks ? "" : "none";
+    });
+    m.setLayoutProperty("landmark-labels", "visibility", "none");
     (m.getSource("shuttle-route") as GeoJSONSource).setData({
       type: "FeatureCollection",
       features: shuttle
@@ -318,22 +463,33 @@ export default function FleetMap({
           ]
         : [],
     });
-  }, [ready, showArea, showBuildings, shuttle, hotel]);
+  }, [
+    ready,
+    showArea,
+    showBuildings,
+    showLandmarks,
+    showZones,
+    shuttle,
+    hotel,
+  ]);
   useEffect(() => {
     const m = map.current;
     if (!ready || !m) return;
     const framed = kind === "valley" ? 12 * 60 : 21 * 60;
-    m.easeTo({ ...viewCamera(shuttle, framed, perspective), duration: 900 });
+    m.easeTo({
+      ...responsiveCamera(shuttle, framed, perspective),
+      duration: window.innerWidth <= 760 ? 0 : 900,
+    });
   }, [ready, kind, perspective, shuttle]);
   useEffect(() => {
     const m = map.current;
     if (!m) return;
     const framed = kind === "valley" ? 12 * 60 : 21 * 60;
-    const camera = viewCamera(shuttle, framed, perspective);
+    const camera = responsiveCamera(shuttle, framed, perspective);
     if (command.kind === "in") m.zoomIn();
     if (command.kind === "out") m.zoomOut();
     if (command.kind === "reset") m.flyTo({ ...camera, duration: 900 });
-    if (command.kind in stations)
+    if (Object.hasOwn(stations, command.kind))
       m.flyTo({
         center: stations[command.kind as Station].coordinates,
         zoom: 14.2,
@@ -394,10 +550,7 @@ export default function FleetMap({
         el.setAttribute("aria-label", `Locate ${v.name} · ${v.driver}`);
         el.setAttribute("aria-pressed", String(selected === v.id));
         el.querySelector("span")!.textContent = v.name;
-        const parent = el.parentElement;
-        if (parent)
-          parent.style.zIndex =
-            selected === v.id ? "24" : Math.abs(offset.dx) > 6 ? "8" : "2";
+        el.style.zIndex = selected === v.id ? "12" : "3";
       });
     };
     sync();

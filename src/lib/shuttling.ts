@@ -4,13 +4,9 @@ export type Terminal = "t1" | "t3";
 export type Station = Terminal | Hotel;
 export type Direction = "outbound" | "return";
 export type ShuttlePhase =
-  | "outbound"
-  | "return"
-  | "loading"
-  | "hotel-stop"
-  | "standby"
-  | "terminal-hop";
-export const isAirport = (s: Station): s is Terminal => s === "t1" || s === "t3";
+  "outbound" | "return" | "loading" | "hotel-stop" | "standby" | "terminal-hop";
+export const isAirport = (s: Station): s is Terminal =>
+  s === "t1" || s === "t3";
 export const stations: Record<
   Station,
   { name: string; short: string; coordinates: [number, number] }
@@ -348,15 +344,13 @@ export function vehicleTiming(
   };
 }
 export function inboundTo(v: ShuttleVehicle, station: Station) {
-  if (isAirport(station))
-    return v.phase === "return" && v.terminal === station;
+  if (isAirport(station)) return v.phase === "return" && v.terminal === station;
   return v.hotel === station && v.phase === "outbound";
 }
 export function atStation(v: ShuttleVehicle, station: Station) {
   if (isAirport(station))
     return (
-      v.terminal === station &&
-      (v.phase === "loading" || v.phase === "standby")
+      v.terminal === station && (v.phase === "loading" || v.phase === "standby")
     );
   return v.hotel === station && v.phase === "hotel-stop";
 }

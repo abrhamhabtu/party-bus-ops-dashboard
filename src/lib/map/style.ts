@@ -21,14 +21,14 @@ export const mapStyle: StyleSpecification = {
     {
       id: "background",
       type: "background",
-      paint: { "background-color": "#141b22" },
+      paint: { "background-color": "#06121d" },
     },
     {
       id: "landcover",
       type: "fill",
       source: "basemap",
       "source-layer": "landcover",
-      paint: { "fill-color": "#17272b", "fill-opacity": 0.7 },
+      paint: { "fill-color": "#0d2328", "fill-opacity": 0.7 },
     },
     {
       id: "landuse",
@@ -40,12 +40,12 @@ export const mapStyle: StyleSpecification = {
           "match",
           ["get", "class"],
           "residential",
-          "#222b34",
+          "#0b1e2c",
           "commercial",
-          "#252d35",
+          "#132534",
           "industrial",
-          "#20272c",
-          "#19292b",
+          "#0b1828",
+          "#091d24",
         ],
         "fill-opacity": 0.7,
       },
@@ -55,7 +55,7 @@ export const mapStyle: StyleSpecification = {
       type: "fill",
       source: "basemap",
       "source-layer": "water",
-      paint: { "fill-color": "#10191f" },
+      paint: { "fill-color": "#071423" },
     },
     {
       id: "aeroway",
@@ -117,7 +117,7 @@ export const mapStyle: StyleSpecification = {
         ],
       ],
       paint: {
-        "line-color": "#3b4652",
+        "line-color": "#23405a",
         "line-width": [
           "interpolate",
           ["linear"],
@@ -133,6 +133,29 @@ export const mapStyle: StyleSpecification = {
       },
     },
     {
+      id: "road-glow",
+      type: "line",
+      source: "basemap",
+      "source-layer": "transportation",
+      filter: ["in", ["get", "class"], ["literal", ["primary", "trunk"]]],
+      paint: {
+        "line-color": "#df9f3a",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          10,
+          2,
+          13,
+          6,
+          16,
+          16,
+        ],
+        "line-blur": 5,
+        "line-opacity": 0.5,
+      },
+    },
+    {
       id: "roads-major",
       type: "line",
       source: "basemap",
@@ -143,7 +166,7 @@ export const mapStyle: StyleSpecification = {
         ["literal", ["motorway", "trunk", "primary"]],
       ],
       paint: {
-        "line-color": "#596572",
+        "line-color": "#9f855c",
         "line-width": [
           "interpolate",
           ["linear"],
@@ -164,7 +187,7 @@ export const mapStyle: StyleSpecification = {
       source: "basemap",
       "source-layer": "building",
       minzoom: 12,
-      paint: { "fill-color": "#34404b", "fill-opacity": 0.5 },
+      paint: { "fill-color": "#254050", "fill-opacity": 0.5 },
     },
     {
       id: "buildings-3d",
@@ -173,10 +196,10 @@ export const mapStyle: StyleSpecification = {
       "source-layer": "building",
       minzoom: 12,
       paint: {
-        "fill-extrusion-color": "#3b4855",
+        "fill-extrusion-color": "#284356",
         "fill-extrusion-height": ["coalesce", ["get", "render_height"], 8],
         "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
-        "fill-extrusion-opacity": 0.75,
+        "fill-extrusion-opacity": 0.85,
       },
     },
     {

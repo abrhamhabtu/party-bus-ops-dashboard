@@ -57,10 +57,7 @@ const along = (
   a: readonly [number, number],
   b: readonly [number, number],
   t: number,
-): [number, number] => [
-  a[0] + (b[0] - a[0]) * t,
-  a[1] + (b[1] - a[1]) * t,
-];
+): [number, number] => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 const parkSpread = (
   id: string,
   at: readonly [number, number],
@@ -69,10 +66,7 @@ const parkSpread = (
   const i = Math.max(1, Number(id.replace(/\D/g, "")) || 1) - 1;
   const col = i % 4;
   const row = Math.floor(i / 4);
-  return [
-    at[0] + (col - 1.5) * radius,
-    at[1] + (row - 1) * radius * 0.85,
-  ];
+  return [at[0] + (col - 1.5) * radius, at[1] + (row - 1) * radius * 0.85];
 };
 export const fleet: Vehicle[] = [
   {
@@ -177,7 +171,13 @@ export const fleet: Vehicle[] = [
       leg(8 * 60 + 30, 40, "Harry Reid · T1", "The Strip · MGM", 30),
       leg(12 * 60, 55, "The Strip · MGM", "Centennial Hills", 12),
       leg(16 * 60, 50, "Centennial Hills", "The Strip · Venetian", 28),
-      leg(19 * 60 + 10, 20, "The Strip · Venetian", "The Strip · Resorts World", 26),
+      leg(
+        19 * 60 + 10,
+        20,
+        "The Strip · Venetian",
+        "The Strip · Resorts World",
+        26,
+      ),
       leg(21 * 60, 18, "The Strip · Resorts World", "The Strip · Bellagio", 22),
       leg(22 * 60 + 20, 22, "The Strip · Bellagio", "Harry Reid · T3", 18),
     ],
@@ -229,7 +229,13 @@ export const fleet: Vehicle[] = [
       leg(14 * 60 + 20, 45, "Spring Valley", "Southern Highlands", 12),
       leg(17 * 60 + 30, 40, "Southern Highlands", "The Strip · MGM", 20),
       leg(20 * 60, 16, "The Strip · MGM", "The Strip · Wynn", 16),
-      leg(21 * 60 + 40, 14, "The Strip · Wynn", "The Strip · Resorts World", 12),
+      leg(
+        21 * 60 + 40,
+        14,
+        "The Strip · Wynn",
+        "The Strip · Resorts World",
+        12,
+      ),
       leg(23 * 60, 20, "The Strip · Resorts World", "Downtown", 8),
     ],
   },

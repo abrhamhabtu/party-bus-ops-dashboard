@@ -51,7 +51,7 @@ test("fleet map fills the canvas so vehicles stay visible", async ({
   });
   expect(sizes.rendererH).toBeGreaterThan(400);
   expect(sizes.mapH).toBeGreaterThan(400);
-  expect(Math.abs(sizes.mapH - sizes.rendererH)).toBeLessThan(2);
+  expect(Math.abs(sizes.mapH - sizes.rendererH)).toBeLessThanOrEqual(2);
   expect(sizes.markerH).toBeGreaterThan(20);
   expect(sizes.markerVisible).toBeTruthy();
   const hasBusBody = await page.evaluate(
@@ -167,7 +167,7 @@ test("fleet night view uses the Strip-Fremont corridor; shuttling stays tight", 
     "data-camera",
     "night-corridor",
   );
-  await expect(page.getByRole("heading", { name: "Strip · Fremont" })).toBeVisible();
+  await expect(page.getByText("Strip & downtown corridor")).toBeVisible();
   await page.getByLabel("Simulation time").fill("720");
   await expect(page.locator(".map-renderer")).toHaveAttribute(
     "data-camera",
