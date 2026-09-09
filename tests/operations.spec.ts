@@ -27,6 +27,34 @@ test("dispatch validates capacity, saves a trip, persists, and completes it", as
   await trip.getByRole("button", { name: "Complete trip" }).click();
   await expect(trip).toContainText("Completed");
 });
+test("fleet map fills the canvas so vehicles stay visible", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await expect(page.locator('[data-map-ready="true"]')).toBeVisible({
+    timeout: 30000,
+  });
+  const sizes = await page.evaluate(() => {
+    const map = document.querySelector(".vector-map");
+    const renderer = document.querySelector(".map-renderer");
+    const marker = document.querySelector(".map-bus");
+    return {
+      mapH: map?.getBoundingClientRect().height ?? 0,
+      rendererH: renderer?.getBoundingClientRect().height ?? 0,
+      markerH: marker?.getBoundingClientRect().height ?? 0,
+      markerVisible: marker
+        ? getComputedStyle(marker).visibility === "visible" &&
+          getComputedStyle(marker).opacity !== "0"
+        : false,
+    };
+  });
+  expect(sizes.rendererH).toBeGreaterThan(400);
+  expect(sizes.mapH).toBeGreaterThan(400);
+  expect(Math.abs(sizes.mapH - sizes.rendererH)).toBeLessThan(2);
+  expect(sizes.markerH).toBeGreaterThan(20);
+  expect(sizes.markerVisible).toBeTruthy();
+});
 test("3D map controls, filtering and shuttle boarding work", async ({
   page,
 }) => {
