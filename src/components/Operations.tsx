@@ -35,12 +35,14 @@ import {
   atStation,
   completedRuns,
   coordinateAlong,
+  driverRotation,
   inboundTo,
   isAirport,
   phaseLabel,
   progressAt,
   routeStats,
   SESSION_START,
+  shuttleBoard,
   shuttleFleet,
   stations,
   terminalHopCoordinate,
@@ -167,6 +169,7 @@ export default function Operations({
     return () => window.removeEventListener("keydown", escape);
   }, []);
   const stats = routeStats(hotel, runs),
+    board = shuttleBoard(hotel, runs),
     routeVehicles = shuttles.filter((v) => v.hotel === hotel);
   const timing = (v: ShuttleVehicle) =>
     vehicleTiming(v, minute, travelBuffer, dwellLimit, runs);
@@ -693,87 +696,185 @@ export default function Operations({
           )}
         </div>
         <section className="route-performance">
-          <div className="section-heading">
-            <h3>{shuttle ? "Trip performance" : "Shuttle performance"}</h3>
-            <div className="chart-toggle">
-              <button
-                className={chartMode === "legs" ? "active" : ""}
-                onClick={() => setChartMode("legs")}
+          {shuttle ? (
+            <>
+              <div className="section-heading">
+                <h3>Trip performance</h3>
+                <small>
+                  {board.dropOffs} drop-offs · {board.milesDriven} mi
+                </small>
+              </div>
+              <div
+                className="rotation-board"
+                aria-label="Airport to hotel rotation"
               >
-                One way
-              </button>
-              <button
-                className={chartMode === "cycles" ? "active" : ""}
-                onClick={() => setChartMode("cycles")}
-              >
-                Round trip
-              </button>
-            </div>
-          </div>
-          <div
-            className="performance-chart"
-            aria-label={`${chartMode === "legs" ? "One-way" : "Round-trip"} duration chart`}
-          >
-            <div className="chart-axis">
-              <span>{chartMode === "legs" ? "30" : "60"}</span>
-              <span>{chartMode === "legs" ? "15" : "30"}</span>
-              <span>0 min</span>
-            </div>
-            <div className="duration-bars">
-              {chartRuns.map((r, i) => (
-                <div
-                  className="bar-group"
-                  key={r.id}
-                  title={`Run ${i + 1}: outbound ${r.hotelArrival - r.depart} min, return ${r.airportReturn! - r.hotelDepart} min, round trip ${r.airportReturn! - r.depart} min`}
-                >
-                  {chartMode === "legs" ? (
-                    <>
-                      <i
-                        className="outbound-bar"
-                        style={{
-                          height: `${((r.hotelArrival - r.depart) / 30) * 100}%`,
-                        }}
-                      />
-                      <i
-                        className="return-bar"
-                        style={{
-                          height: `${((r.airportReturn! - r.hotelDepart) / 30) * 100}%`,
-                        }}
-                      />
-                    </>
-                  ) : (
-                    <i
-                      className="cycle-bar"
-                      style={{
-                        height: `${Math.min(100, ((r.airportReturn! - r.depart) / 60) * 100)}%`,
-                      }}
-                    />
-                  )}
-                  <small>{String(i + 1).padStart(2, "0")}</small>
+                <div className="rotation-stop">
+                  <b>{board.airport}</b>
+                  <small>Airport</small>
                 </div>
-              ))}
-            </div>
-          </div>
-          <div className="performance-key">
-            {chartMode === "legs" ? (
-              <>
-                <span>
-                  <i />
-                  To hotel
-                </span>
-                <span>
-                  <i />
-                  To airport
-                </span>
-              </>
-            ) : (
-              <span>
-                <i />
-                Full cycle incl. hotel stop
-              </span>
-            )}
-            <small>{chartRuns.length} completed · demo</small>
-          </div>
+                <div className="rotation-leg">
+                  <em>{board.outbound ?? "—"} min</em>
+                  <span />
+                  <small>{board.oneWayMiles} mi out</small>
+                </div>
+                <div className="rotation-stop hotel">
+                  <b>{board.hotelName}</b>
+                  <small>
+                    Drop-off · {board.dwell ?? "—"} min turn
+                  </small>
+                </div>
+                <div className="rotation-leg return">
+                  <em>{board.return ?? "—"} min</em>
+                  <span />
+                  <small>{board.oneWayMiles} mi back</small>
+                </div>
+                <div className="rotation-stop">
+                  <b>{board.airport}</b>
+                  <small>Airport</small>
+                </div>
+              </div>
+              <div className="rotation-totals">
+                <div>
+                  <strong>{board.roundTrip ?? "—"}</strong>
+                  <span>min cycle</span>
+                </div>
+                <div>
+                  <strong>{board.roundMiles}</strong>
+                  <span>mi round</span>
+                </div>
+                <div>
+                  <strong>{board.milesDriven}</strong>
+                  <span>Miles tonight</span>
+                </div>
+                <div>
+                  <strong>{board.dropOffs}</strong>
+                  <span>Hotel drop-offs</span>
+                </div>
+                <div>
+                  <strong>{board.guests}</strong>
+                  <span>guests moved</span>
+                </div>
+              </div>
+              <ul className="driver-rotations">
+                {routeVehicles.slice(0, 5).map((v) => {
+                  const row = driverRotation(v, minute, runs);
+                  const denom = Math.max(1, row.expected ?? 20);
+                  const pct = Math.min(100, (row.elapsed / denom) * 100);
+                  return (
+                    <li key={v.id}>
+                      <button
+                        className={selected === v.id ? "selected" : ""}
+                        aria-label={`${row.driver} · ${row.name}`}
+                        onClick={() => setSelected(v.id)}
+                      >
+                        <span>
+                          <strong>{row.driver}</strong>
+                          <small>
+                            {row.name} · {phaseLabel(v)}
+                          </small>
+                        </span>
+                        <b>
+                          {row.elapsed} / {row.expected ?? "—"} min
+                          <small>
+                            {row.miles} mi
+                            {row.guests ? ` · ${row.guests} on board` : ""}
+                          </small>
+                        </b>
+                        <i
+                          className={row.attention ? "late" : ""}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          ) : (
+            <>
+              <div className="section-heading">
+                <h3>Shuttle performance</h3>
+                <div className="chart-toggle">
+                  <button
+                    className={chartMode === "legs" ? "active" : ""}
+                    onClick={() => setChartMode("legs")}
+                  >
+                    One way
+                  </button>
+                  <button
+                    className={chartMode === "cycles" ? "active" : ""}
+                    onClick={() => setChartMode("cycles")}
+                  >
+                    Round trip
+                  </button>
+                </div>
+              </div>
+              <div
+                className="performance-chart"
+                aria-label={`${chartMode === "legs" ? "One-way" : "Round-trip"} duration chart`}
+              >
+                <div className="chart-axis">
+                  <span>{chartMode === "legs" ? "30" : "60"}</span>
+                  <span>{chartMode === "legs" ? "15" : "30"}</span>
+                  <span>0 min</span>
+                </div>
+                <div className="duration-bars">
+                  {chartRuns.map((r, i) => (
+                    <div
+                      className="bar-group"
+                      key={r.id}
+                      title={`Run ${i + 1}: outbound ${r.hotelArrival - r.depart} min, return ${r.airportReturn! - r.hotelDepart} min, round trip ${r.airportReturn! - r.depart} min`}
+                    >
+                      {chartMode === "legs" ? (
+                        <>
+                          <i
+                            className="outbound-bar"
+                            style={{
+                              height: `${((r.hotelArrival - r.depart) / 30) * 100}%`,
+                            }}
+                          />
+                          <i
+                            className="return-bar"
+                            style={{
+                              height: `${((r.airportReturn! - r.hotelDepart) / 30) * 100}%`,
+                            }}
+                          />
+                        </>
+                      ) : (
+                        <i
+                          className="cycle-bar"
+                          style={{
+                            height: `${Math.min(100, ((r.airportReturn! - r.depart) / 60) * 100)}%`,
+                          }}
+                        />
+                      )}
+                      <small>{String(i + 1).padStart(2, "0")}</small>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="performance-key">
+                {chartMode === "legs" ? (
+                  <>
+                    <span>
+                      <i />
+                      To hotel
+                    </span>
+                    <span>
+                      <i />
+                      To airport
+                    </span>
+                  </>
+                ) : (
+                  <span>
+                    <i />
+                    Full cycle incl. hotel stop
+                  </span>
+                )}
+                <small>{chartRuns.length} completed · demo</small>
+              </div>
+            </>
+          )}
         </section>
         {shuttle ? (
           <section className="arrivals-panel">

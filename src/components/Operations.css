@@ -617,6 +617,160 @@
   color: #6d86a2;
   margin-left: auto;
 }
+.rotation-board {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin: 12px 0 10px;
+  border: 1px solid #3a352c;
+  background: #100e0b;
+}
+.rotation-stop {
+  flex: 0.9;
+  padding: 8px 7px 7px;
+  min-width: 0;
+}
+.rotation-stop b {
+  display: block;
+  font:
+    600 9px "Syne",
+    sans-serif;
+  letter-spacing: 0.04em;
+  color: #efe8d8;
+}
+.rotation-stop small {
+  display: block;
+  margin-top: 3px;
+  font-size: 7px;
+  color: #8a8170;
+}
+.rotation-stop.hotel {
+  background: #1d1912;
+  border-left: 1px solid #3a352c;
+  border-right: 1px solid #3a352c;
+}
+.rotation-leg {
+  flex: 1.1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px;
+  min-width: 0;
+}
+.rotation-leg em {
+  font-style: normal;
+  font:
+    600 10px "Syne",
+    sans-serif;
+  color: #e2c48a;
+}
+.rotation-leg span {
+  display: block;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, #3a352c, #c4a574, #3a352c);
+}
+.rotation-leg.return span {
+  background: linear-gradient(90deg, #3a352c, #7a9aa3, #3a352c);
+}
+.rotation-leg.return em {
+  color: #9ad0c6;
+}
+.rotation-leg small {
+  font-size: 7px;
+  color: #8a8170;
+}
+.rotation-totals {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1px;
+  background: #3a352c;
+  border: 1px solid #3a352c;
+  margin-bottom: 12px;
+}
+.rotation-totals > div {
+  background: #141311;
+  padding: 7px 6px 6px;
+}
+.rotation-totals strong {
+  display: block;
+  font:
+    600 13px "Syne",
+    sans-serif;
+  color: #efe8d8;
+}
+.rotation-totals span {
+  display: block;
+  margin-top: 2px;
+  font-size: 7px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8a8170;
+}
+.driver-rotations {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.driver-rotations button {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 10px;
+  background: #12100c;
+  border: 1px solid #2f2c27;
+  border-radius: 0;
+  color: #d8d0c2;
+  text-align: left;
+  overflow: hidden;
+}
+.driver-rotations button.selected {
+  border-color: #c4a574;
+  background: #1d1912;
+}
+.driver-rotations button > span {
+  flex: 1;
+  min-width: 0;
+}
+.driver-rotations strong {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: #efe8d8;
+}
+.driver-rotations small {
+  display: block;
+  margin-top: 2px;
+  font-size: 8px;
+  color: #8a8170;
+}
+.driver-rotations b {
+  font-size: 10px;
+  font-weight: 600;
+  color: #e2c48a;
+  text-align: right;
+  flex-shrink: 0;
+}
+.driver-rotations b small {
+  color: #9a9182;
+}
+.driver-rotations i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  background: #c4a574;
+}
+.driver-rotations i.late {
+  background: #d2b987;
+}
 .coverage-panel {
   padding: 14px 13px 8px;
   flex: 1;
@@ -1820,6 +1974,19 @@
   }
   .chart-toggle button {
     font-size: 8px;
+  }
+  .rotation-board {
+    flex-wrap: wrap;
+  }
+  .rotation-stop,
+  .rotation-leg {
+    flex: 1 1 33%;
+  }
+  .rotation-totals {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .driver-rotations button {
+    padding: 9px 8px 11px;
   }
   .performance-key {
     font-size: 9px;

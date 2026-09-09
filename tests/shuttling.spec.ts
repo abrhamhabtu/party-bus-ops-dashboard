@@ -10,6 +10,8 @@ import {
   coordinateAlong,
   progressAt,
   SESSION_START,
+  shuttleBoard,
+  driverRotation,
 } from "../src/lib/shuttling";
 
 test("discreet fleet names match the published party-bus roster", () => {
@@ -57,6 +59,36 @@ test("directional averages include completed legs; full cycles include hotel dwe
   expect(result.completed).toBe(8);
   expect(result.roundTrip).toBe(49);
   expect(result.return).toBe(20.5);
+});
+test("shuttle board reports cycle minutes, miles, and drop-offs for Venetian and Virgin", () => {
+  const venetian = shuttleBoard("venetian");
+  expect(venetian.roundTrip).toBe(49);
+  expect(venetian.dwell).toBe(7);
+  expect(venetian.airport).toBe("T1 / T3");
+  expect(venetian.hotelName).toBe("The Venetian");
+  expect(venetian.oneWayMiles).toBe(4.8);
+  expect(venetian.roundMiles).toBe(9.6);
+  expect(venetian.milesDriven).toBe(76.8);
+  expect(venetian.dropOffs).toBe(8);
+  expect(venetian.guests).toBe(176);
+  const virgin = shuttleBoard("virgin");
+  expect(virgin.roundTrip).toBe(32);
+  expect(virgin.airport).toBe("T3");
+  expect(virgin.hotelName).toBe("Virgin Hotels");
+  expect(virgin.oneWayMiles).toBe(3.2);
+  expect(virgin.roundMiles).toBe(6.4);
+  expect(virgin.dropOffs).toBe(4);
+  expect(virgin.guests).toBe(40);
+});
+test("driver rotation shows how long a shuttle has been on the current airport-hotel leg", () => {
+  const buffalo = shuttleFleet.find((v) => v.name === "Buffalo")!;
+  const row = driverRotation(buffalo, SESSION_START);
+  expect(row.driver).toBe("Marcus Johnson");
+  expect(row.phase).toBe("outbound");
+  expect(row.elapsed).toBe(17);
+  expect(row.expected).toBe(21.5);
+  expect(row.miles).toBeGreaterThan(3);
+  expect(row.guests).toBe(24);
 });
 test("delay review distinguishes travel, loading, and stale GPS; clock changes never create negative durations", () => {
   const delayed = shuttleFleet.find((v) => v.id === "DL-03")!;
@@ -110,11 +142,28 @@ test("hotel switch, stale state, thresholds, and complete-cycle averages update 
   await expect(
     page.getByRole("heading", { name: "Inbound to Venetian", exact: true }),
   ).toBeVisible();
+  await expect(page.getByLabel("Airport to hotel rotation")).toContainText(
+    "The Venetian",
+  );
+  await expect(page.getByLabel("Airport to hotel rotation")).toContainText(
+    "4.8 mi",
+  );
+  await expect(
+    page.getByRole("button", { name: "Marcus Johnson · Buffalo" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Virgin Hotel", exact: true }).click();
   await expect(page.getByLabel("Shuttle route")).toHaveValue("virgin");
   await expect(
     page.locator(".telemetry-stat").filter({ hasText: "Round trip" }),
   ).toContainText("32");
+  await expect(page.getByLabel("Airport to hotel rotation")).toContainText(
+    "Virgin Hotels",
+  );
+  await expect(page.getByLabel("Airport to hotel rotation")).toContainText(
+    "3.2 mi",
+  );
+  await expect(page.getByText("Miles tonight")).toBeVisible();
+  await expect(page.getByText("Hotel drop-offs")).toBeVisible();
   await page.getByRole("button", { name: "T1 ground", exact: true }).click();
   await page.getByLabel("Shuttle route").selectOption("venetian");
   await page.getByRole("button", { name: "View High Stakes", exact: true }).click();

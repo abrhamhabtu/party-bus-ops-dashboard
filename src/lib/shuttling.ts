@@ -243,6 +243,62 @@ export function routeStats(hotel: Hotel, runs = completedRuns) {
     completed: complete.length,
   };
 }
+export const ROUTE_MILES = { venetian: 4.8, virgin: 3.2 } as const;
+const round1 = (n: number) => Math.round(n * 10) / 10;
+export function shuttleBoard(hotel: Hotel, runs = completedRuns) {
+  const stats = routeStats(hotel, runs);
+  const oneWayMiles = ROUTE_MILES[hotel];
+  const roundMiles = round1(oneWayMiles * 2);
+  const guestsPerCycle = hotel === "venetian" ? 22 : 10;
+  return {
+    ...stats,
+    airport: hotel === "venetian" ? "T1 / T3" : "T3",
+    hotelName: hotel === "venetian" ? "The Venetian" : "Virgin Hotels",
+    oneWayMiles,
+    roundMiles,
+    milesDriven: round1(stats.completed * roundMiles),
+    dropOffs: stats.completed,
+    guests: stats.completed * guestsPerCycle,
+  };
+}
+export function driverRotation(
+  v: ShuttleVehicle,
+  minute: number,
+  runs = completedRuns,
+) {
+  const stats = routeStats(v.hotel, runs);
+  const timing = vehicleTiming(v, minute, 5, 10, runs);
+  const oneWay = ROUTE_MILES[v.hotel];
+  const expected =
+    v.phase === "outbound"
+      ? stats.outbound
+      : v.phase === "return"
+        ? stats.return
+        : v.phase === "hotel-stop" || v.phase === "loading"
+          ? stats.dwell
+          : v.phase === "terminal-hop"
+            ? 8
+            : null;
+  const miles =
+    v.phase === "outbound"
+      ? round1(oneWay * v.progress)
+      : v.phase === "return"
+        ? round1(oneWay + oneWay * v.progress)
+        : v.phase === "hotel-stop"
+          ? oneWay
+          : 0;
+  return {
+    id: v.id,
+    name: v.name,
+    driver: v.driver,
+    phase: v.phase,
+    elapsed: timing.elapsed,
+    expected,
+    miles,
+    guests: v.passengers,
+    attention: timing.attention,
+  };
+}
 export function vehicleTiming(
   v: ShuttleVehicle,
   minute: number,
