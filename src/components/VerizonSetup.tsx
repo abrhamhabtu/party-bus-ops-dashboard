@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
 import {
+  AlertTriangle,
   ArrowUpRight,
   Check,
   ChevronRight,
+  Gauge,
   KeyRound,
   LockKeyhole,
+  MapPinned,
   Radio,
   RefreshCw,
   ShieldCheck,
   Video,
 } from "lucide-react";
+import { fleet, readSaved } from "../lib/data";
 type ConnectionState = {
   configured: boolean;
   testVehicleConfigured: boolean;
@@ -26,7 +30,18 @@ export default function VerizonSetup() {
     [key, setKey] = useState(""),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(""),
-    [unavailable, setUnavailable] = useState(false);
+    [unavailable, setUnavailable] = useState(false),
+    [mapping, setMapping] = useState<Record<string, string>>(() =>
+      readSaved("vegas-verizon-mapping", {}),
+    );
+  useEffect(() => {
+    try {
+      localStorage.setItem("vegas-verizon-mapping", JSON.stringify(mapping));
+    } catch {
+      /* draft stays in memory for this session */
+    }
+  }, [mapping]);
+  const mappedCount = fleet.filter((v) => mapping[v.id]?.trim()).length;
   async function refresh() {
     try {
       const r = await fetch("/api/verizon/status");
@@ -251,6 +266,93 @@ export default function VerizonSetup() {
             </div>
           </div>
         </div>
+      </div>
+      <div className="vehicle-mapping">
+        <div className="section-heading">
+          <div>
+            <h3>Vehicle mapping</h3>
+            <p className="subtle">
+              Reveal identifies vehicles by its own device/vehicle number, not
+              by the names your team already uses. Pair each one so a Reveal
+              reading resolves to a bus your team recognizes.
+            </p>
+          </div>
+          <span className="mapping-progress">
+            {mappedCount} / {fleet.length} mapped
+          </span>
+        </div>
+        <div className="mapping-list">
+          {fleet.map((v) => (
+            <div className="mapping-row" key={v.id}>
+              <div className="mapping-vehicle">
+                <strong>{v.name}</strong>
+                <span>
+                  {v.id} · {v.driver}
+                </span>
+              </div>
+              <label className="mapping-input">
+                <span className="micro-label">Reveal vehicle number</span>
+                <input
+                  aria-label={`Reveal vehicle number for ${v.name}`}
+                  placeholder="e.g. 104822"
+                  value={mapping[v.id] ?? ""}
+                  onChange={(e) =>
+                    setMapping((m) => ({ ...m, [v.id]: e.target.value }))
+                  }
+                />
+              </label>
+            </div>
+          ))}
+        </div>
+        <p className="setup-help">
+          This mapping is a local draft saved in this browser only — it
+          previews how one roster-wide pairing would replace the single
+          <code> VERIZON_TEST_VEHICLE_NUMBER</code> the server supports today.
+          Live mode still requires validating your account's vehicle-number
+          format against this roster.
+        </p>
+      </div>
+      <div className="connection-unlocks">
+        <h3>What connecting unlocks</h3>
+        <p className="subtle">
+          None of this is active yet. Once GPS mapping is verified, these
+          replace their demo equivalents one at a time.
+        </p>
+        {[
+          {
+            icon: Radio,
+            title: "Live GPS in place of the demo replay",
+            text: "Real vehicle positions and the 24-hour replay scrubber give way to an actual live feed once payload mapping is verified.",
+          },
+          {
+            icon: Gauge,
+            title: "Telematics-driven ETAs",
+            text: "Pickup and shuttle ETAs come from measured vehicle speed and position instead of the scheduled demo legs.",
+          },
+          {
+            icon: AlertTriangle,
+            title: "Safety and harsh-event alerts",
+            text: "Hard-brake, speeding, and idle-time events can feed the same maintenance and notifications inbox used for demo alerts today.",
+          },
+          {
+            icon: MapPinned,
+            title: "Geofenced arrival and departure",
+            text: "T1/T3, hotel, and Venetian geofences can advance a shuttle's cycle automatically, replacing the manual departure/arrival buttons.",
+          },
+          {
+            icon: Video,
+            title: "Dashcam clip retrieval — separate approval",
+            text: "Road-facing and driver-facing footage tied to a trip or event requires its own Verizon video product and permissions beyond GPS access.",
+          },
+        ].map((x) => (
+          <div className="driver-feature" key={x.title}>
+            <x.icon size={22} />
+            <div>
+              <h3>{x.title}</h3>
+              <p>{x.text}</p>
+            </div>
+          </div>
+        ))}
       </div>
       <div className="setup-boundary">
         <ShieldCheck size={17} />

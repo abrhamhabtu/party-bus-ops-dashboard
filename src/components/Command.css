@@ -1,16 +1,9 @@
 /* Vegas Fleet Command — reference-driven night operations skin. */
-:root {
-  --panel: #081827;
-  --line: #1c3852;
-  --accent: #3ecbff;
-  background: #040e19;
-  color: #d8e5f5;
-}
 body {
-  background: #040e19;
+  background: var(--bg);
 }
 .app-shell {
-  background: #040e19;
+  background: var(--bg);
 }
 .rail {
   width: 142px;
@@ -138,13 +131,11 @@ body {
   display: block;
   position: relative;
   color: #eddd9f;
-  font-family: Georgia, serif;
-  font-weight: 400;
-  font-size: 42px;
+  font-weight: 700;
+  font-size: 38px;
   line-height: 1;
   width: 34px;
   text-shadow: 1px 2px 0 #795922;
-  transform: scaleX(1.06);
 }
 .command-logo > span {
   position: absolute;
@@ -970,6 +961,97 @@ body {
   border-top: 1px solid #27415e;
   padding-top: 18px;
 }
+.vehicle-mapping {
+  background: #091a2c;
+  border: 1px solid #284765;
+  border-radius: 8px;
+  margin: 0 0 20px;
+  padding: 22px 24px;
+}
+.vehicle-mapping .section-heading {
+  align-items: flex-start;
+}
+.vehicle-mapping .section-heading h3 {
+  font-size: 13px;
+  color: #d4e6fa;
+  margin-bottom: 6px;
+}
+.vehicle-mapping .section-heading p {
+  font-size: 11px;
+  color: #809bb9;
+  line-height: 1.7;
+  max-width: 480px;
+}
+.mapping-progress {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: #9eb5cf;
+  border: 1px solid #34506e;
+  background: #10243a;
+  border-radius: 4px;
+  padding: 6px 9px;
+}
+.mapping-list {
+  margin-top: 20px;
+  display: grid;
+  gap: 10px;
+}
+.mapping-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid #1d334c;
+  border-radius: 6px;
+  background: #071625;
+  flex-wrap: wrap;
+}
+.mapping-vehicle {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #d4e6fa;
+  min-width: 140px;
+}
+.mapping-vehicle span {
+  font-size: 10px;
+  color: #7692b1;
+}
+.mapping-input {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-width: 180px;
+  max-width: 260px;
+}
+.mapping-input input {
+  background: #10243a;
+  border: 1px solid #365878;
+  color: #d4e6fa;
+  padding: 8px 10px;
+  font-size: 11px;
+  border-radius: 4px;
+}
+.connection-unlocks {
+  background: #091a2c;
+  border: 1px solid #284765;
+  border-radius: 8px;
+  margin: 0 0 20px;
+  padding: 22px 24px;
+}
+.connection-unlocks > h3 {
+  font-size: 13px;
+  color: #d4e6fa;
+}
+.connection-unlocks > p {
+  font-size: 11px;
+  color: #809bb9;
+  line-height: 1.7;
+  margin: 6px 0 4px;
+}
 .camera-page-toolbar {
   display: flex;
   justify-content: space-between;
@@ -1465,8 +1547,12 @@ body {
     background: #0d2b4a;
   }
   .rail > .rail-button,
-  .sidebar-signature {
+  .sidebar-signature,
+  .rail-nav .rail-secondary {
     display: none;
+  }
+  .rail-nav .rail-more {
+    display: flex;
   }
   .workspace {
     width: 100%;
@@ -1643,7 +1729,7 @@ body {
     bottom: auto;
     margin: 10px 10px 0;
     height: 104px;
-    order: 2;
+    order: 3;
   }
   .fleet-dock.expanded,
   .fleet-mode .fleet-dock.expanded {
@@ -1682,7 +1768,7 @@ body {
     width: auto;
     overflow: visible;
     margin: 12px 10px;
-    order: 3;
+    order: 2;
     gap: 12px;
   }
   .fleet-overview-card {
@@ -1757,7 +1843,7 @@ body {
     right: auto;
     bottom: auto;
     width: auto;
-    order: 3;
+    order: 2;
     margin: 12px 10px;
     overflow: visible;
   }

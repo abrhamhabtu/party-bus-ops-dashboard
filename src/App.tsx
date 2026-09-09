@@ -8,6 +8,7 @@ import {
   Check,
   Clock,
   LayoutDashboard,
+  MoreHorizontal,
   Plus,
   Radio,
   Route,
@@ -51,6 +52,7 @@ function App() {
     [modal, setModal] = useState(false),
     [toast, setToast] = useState(""),
     [alerts, setAlerts] = useState(false),
+    [moreOpen, setMoreOpen] = useState(false),
     [resolved, setResolved] = useState(false),
     [shiftEnd, setShiftEnd] = useState<number | null>(null),
     [now, setNow] = useState(() => Date.now());
@@ -93,13 +95,14 @@ function App() {
       if (e.key === "Escape") {
         setModal(false);
         setAlerts(false);
+        setMoreOpen(false);
       }
     };
     window.addEventListener("keydown", fn);
     return () => window.removeEventListener("keydown", fn);
   }, []);
   useEffect(() => {
-    if (!modal && !alerts) return;
+    if (!modal && !alerts && !moreOpen) return;
     const previous = document.activeElement as HTMLElement | null;
     const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
     if (!dialog) return;
@@ -128,7 +131,7 @@ function App() {
       dialog.removeEventListener("keydown", trap);
       previous?.focus();
     };
-  }, [modal, alerts]);
+  }, [modal, alerts, moreOpen]);
   function exportTrips() {
     const rows = [
       [
@@ -192,17 +195,20 @@ function App() {
               { name: "Overview", icon: LayoutDashboard },
               { name: "Dispatch", icon: CalendarDays },
               { name: "Fleet", icon: BusFront },
-              { name: "Cameras", icon: Video },
-              { name: "Maintenance", icon: Wrench },
-              { name: "Reports", icon: BarChart3 },
               { name: "Shuttles", icon: Route },
-              { name: "Drivers", icon: Users },
-              { name: "Integrations", icon: SlidersHorizontal },
+              { name: "Cameras", icon: Video, secondary: true },
+              { name: "Maintenance", icon: Wrench, secondary: true },
+              { name: "Reports", icon: BarChart3, secondary: true },
+              { name: "Drivers", icon: Users, secondary: true },
+              { name: "Integrations", icon: SlidersHorizontal, secondary: true },
             ] as const
           ).map((n) => (
             <button
               key={n.name}
-              className={view === n.name ? "rail-button active" : "rail-button"}
+              className={
+                (view === n.name ? "rail-button active" : "rail-button") +
+                ("secondary" in n && n.secondary ? " rail-secondary" : "")
+              }
               title={n.name}
               aria-label={n.name === "Shuttles" ? "Shuttling" : n.name}
               onClick={() => {
@@ -219,6 +225,28 @@ function App() {
               </span>
             </button>
           ))}
+          <button
+            className={
+              (
+                [
+                  "Cameras",
+                  "Maintenance",
+                  "Reports",
+                  "Drivers",
+                  "Integrations",
+                ] as const
+              ).includes(view as never)
+                ? "rail-button rail-more active"
+                : "rail-button rail-more"
+            }
+            title="More"
+            aria-label="More sections"
+            aria-haspopup="dialog"
+            onClick={() => setMoreOpen(true)}
+          >
+            <MoreHorizontal size={20} />
+            <span>More</span>
+          </button>
         </div>
         <button
           className="rail-button"
@@ -630,6 +658,51 @@ function App() {
               <Check size={16} />
               {resolved ? "Acknowledged" : "Acknowledge alert"}
             </button>
+          </section>
+        </div>
+      )}
+      {moreOpen && (
+        <div className="overlay sheet-overlay" onClick={() => setMoreOpen(false)}>
+          <section
+            className="dialog more-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="more-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex-between">
+              <h2 id="more-title">More</h2>
+              <button
+                className="icon-button"
+                aria-label="Close"
+                onClick={() => setMoreOpen(false)}
+              >
+                <X />
+              </button>
+            </div>
+            <div className="more-sheet-grid">
+              {(
+                [
+                  { name: "Cameras", icon: Video },
+                  { name: "Maintenance", icon: Wrench },
+                  { name: "Reports", icon: BarChart3 },
+                  { name: "Drivers", icon: Users },
+                  { name: "Integrations", icon: SlidersHorizontal },
+                ] as const
+              ).map((n) => (
+                <button
+                  key={n.name}
+                  className={view === n.name ? "more-sheet-item active" : "more-sheet-item"}
+                  onClick={() => {
+                    setView(n.name);
+                    setMoreOpen(false);
+                  }}
+                >
+                  <n.icon size={20} />
+                  {n.name}
+                </button>
+              ))}
+            </div>
           </section>
         </div>
       )}

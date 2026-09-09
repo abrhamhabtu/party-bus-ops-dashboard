@@ -34,6 +34,9 @@ Use **Demo scenes** above the map to load Daytime fleet, Strip at night, Airport
 - Dedicated fleet directory, disconnected road/driver camera views, maintenance acknowledgment, schedule reporting and CSV export.
 - Gold Vegas landmark silhouettes, cyan/gold bus markers, activity zones, map layers, and a schedule-derived ride activity chart.
 - Server-only Verizon Reveal credential and vehicle-location access checks; credentials never enter the client bundle. Live mapping remains disabled pending account payload validation.
+- **Vehicle mapping preview:** pair each bus in the roster with its Reveal vehicle number, and a "what connecting unlocks" summary (live GPS, telematics ETAs, safety alerts, geofenced shuttle cycles, and separately-gated dashcam retrieval) on the Integrations screen — a local draft, not a live sync.
+- One consolidated design system: a single type family and color/spacing tokens shared across the shell, map workspace, and command surfaces, replacing the mismatched fonts/colors left over from earlier iterations.
+- Mobile-first navigation: a 4-item bottom bar (Operations, Dispatch, Fleet, Shuttling) plus a **More** sheet for the remaining sections, and a reordered mobile Operations view that surfaces the Fleet Overview stats right after the map instead of at the bottom of a long scroll.
 - Desktop/mobile layouts and browser workflow tests.
 
 ## Scope and limitations
@@ -79,7 +82,8 @@ A normal Reveal login alone does not activate this integration. Request API acce
 2. Set `VERIZON_TEST_VEHICLE_NUMBER` to the actual provider vehicle **number**, which may differ from its display name.
 3. Set `APP_ACCESS_TOKEN` to a long random operator key. Restart the development server after changing these variables.
 4. Open Integrations, enter the operator key, and select **Verify read-only API access**. The key is held in memory and cleared after the check. This checks authentication and, when configured, one vehicle's location endpoint. It does not enable live map data.
-5. Before enabling real operations, validate your account response schema, map provider vehicle numbers to this roster, add shared storage and authenticated manager roles, and implement GPS ingestion with freshness/error handling. Driver phone background tracking requires a separate native app implementation.
+5. Use the **Vehicle mapping** table on the same screen to pair each bus's existing name (Buffalo, Bankroll, Max Bet, and so on) with its actual Reveal vehicle number. This is a local browser draft that previews the multi-vehicle version of `VERIZON_TEST_VEHICLE_NUMBER`; it does not push anything to the server yet.
+6. Before enabling real operations, validate your account response schema, map provider vehicle numbers to this roster, add shared storage and authenticated manager roles, and implement GPS ingestion with freshness/error handling. Driver phone background tracking requires a separate native app implementation. The **What connecting unlocks** list on the same screen tracks which demo behaviors (replay, scheduled ETAs, manual shuttle events) each of these replaces once live.
 
 ```sh
 npm run test:server # mock provider auth, token caching, redaction, API authorization

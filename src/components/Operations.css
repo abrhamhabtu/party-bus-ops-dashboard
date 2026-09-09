@@ -1,12 +1,4 @@
 /* A map-first operations surface, derived from the supplied mobility simulator. */
-:root {
-  --accent: #e2c48a;
-  --panel: #141311;
-  --line: #2f2c27;
-  --muted: #9a9386;
-  color: #ece7dc;
-  background: #090909;
-}
 .app-shell {
   background: #090909;
 }
@@ -324,9 +316,8 @@
   color: #8a8170;
 }
 .geographic-title h1 {
-  font:
-    600 30px "Syne",
-    sans-serif;
+  font-size: 30px;
+  font-weight: 600;
   letter-spacing: -0.6px;
   margin: 7px 0;
   color: #efe8d8;
@@ -457,18 +448,17 @@
   color: #9daec4;
 }
 .telemetry-stat strong {
-  font:
-    500 26px "DM Sans",
-    sans-serif;
+  font-size: 26px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
   letter-spacing: -0.7px;
   display: block;
   margin-top: 7px;
   line-height: 1;
 }
 .telemetry-stat strong small {
-  font:
-    400 8px "DM Sans",
-    sans-serif;
+  font-size: 8px;
+  font-weight: 400;
   letter-spacing: 0;
   color: #9cacbe;
   margin-left: 5px;
@@ -632,9 +622,8 @@
 }
 .rotation-stop b {
   display: block;
-  font:
-    600 9px "Syne",
-    sans-serif;
+  font-size: 9px;
+  font-weight: 600;
   letter-spacing: 0.04em;
   color: #efe8d8;
 }
@@ -661,9 +650,8 @@
 }
 .rotation-leg em {
   font-style: normal;
-  font:
-    600 10px "Syne",
-    sans-serif;
+  font-size: 10px;
+  font-weight: 600;
   color: #e2c48a;
 }
 .rotation-leg span {
@@ -696,9 +684,8 @@
 }
 .rotation-totals strong {
   display: block;
-  font:
-    600 13px "Syne",
-    sans-serif;
+  font-size: 13px;
+  font-weight: 600;
   color: #efe8d8;
 }
 .rotation-totals span {
@@ -1006,7 +993,6 @@
   flex-shrink: 0;
 }
 .map-bus > span {
-  font-family: "Syne", sans-serif;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -2344,8 +2330,4 @@
 .standard-workspace .driver-note,
 .standard-workspace .integration-detail {
   color: #8ca5bf;
-}
-.standard-workspace .dialog {
-  background: #1a293b;
-  border-color: #47617e;
 }

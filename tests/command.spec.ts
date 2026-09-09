@@ -45,16 +45,20 @@ test("phone navigation reaches all workspaces without horizontal overflow", asyn
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  for (const name of [
-    "Fleet",
-    "Cameras",
-    "Maintenance",
-    "Reports",
-    "Integrations",
-    "Drivers",
-    "Dispatch",
-    "Overview",
-  ]) {
+  const primary = ["Fleet", "Dispatch", "Overview"];
+  const secondary = ["Cameras", "Maintenance", "Reports", "Integrations", "Drivers"];
+  for (const name of primary) {
+    await page.getByRole("button", { name, exact: true }).click();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  }
+  for (const name of secondary) {
+    await page
+      .getByRole("button", { name: "More sections", exact: true })
+      .click();
     await page.getByRole("button", { name, exact: true }).click();
     expect(
       await page.evaluate(
