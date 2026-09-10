@@ -1,5 +1,10 @@
+import fleetRoutesData from "./map/fleet-routes.json" with { type: "json" };
 export type Status = "On trip" | "Available" | "To pickup" | "Offline";
 export type PlaceId = keyof typeof places;
+const fleetRoutes = fleetRoutesData as unknown as Record<
+  string,
+  [number, number][]
+>;
 export const FLEET_DAY_MINUTES = 24 * 60;
 export const FLEET_EVENING = 20 * 60 + 18;
 export const places = {
@@ -37,9 +42,10 @@ export type Vehicle = {
   fuel: number;
   legs: FleetLeg[];
 };
+// Kept fractional: the map samples this clock every animation frame, and
+// flooring to whole minutes made vehicles hop a block at a time.
 const wrap = (minute: number) =>
-  ((Math.floor(minute) % FLEET_DAY_MINUTES) + FLEET_DAY_MINUTES) %
-  FLEET_DAY_MINUTES;
+  ((minute % FLEET_DAY_MINUTES) + FLEET_DAY_MINUTES) % FLEET_DAY_MINUTES;
 const leg = (
   start: number,
   duration: number,
@@ -58,6 +64,89 @@ const along = (
   b: readonly [number, number],
   t: number,
 ): [number, number] => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+/** Degrees of longitude are shorter than latitude this far north. */
+const LNG_SCALE = 0.81;
+const DEG_TO_M = 111320;
+const segmentLengths = (path: readonly [number, number][]) =>
+  path
+    .slice(1)
+    .map((p, i) =>
+      Math.hypot((p[0] - path[i][0]) * LNG_SCALE, p[1] - path[i][1]),
+    );
+/** Compass bearing (degrees clockwise from north) from a to b. */
+const bearingBetween = (
+  a: readonly [number, number],
+  b: readonly [number, number],
+): number => {
+  const east = (b[0] - a[0]) * LNG_SCALE;
+  const north = b[1] - a[1];
+  if (!east && !north) return 0;
+  return (Math.atan2(east, north) * 180) / Math.PI;
+};
+/**
+ * Walks `fraction` of the way along a road polyline and reports both the
+ * position and the direction the road runs there, so a vehicle sits on the
+ * asphalt and points the way it is travelling.
+ */
+export const alongPath = (
+  path: readonly [number, number][],
+  fraction: number,
+): { coordinates: [number, number]; heading: number } => {
+  if (path.length < 2)
+    return { coordinates: [...path[0]] as [number, number], heading: 0 };
+  const lengths = segmentLengths(path);
+  const total = lengths.reduce((a, b) => a + b, 0);
+  let distance = Math.max(0, Math.min(1, fraction)) * total;
+  for (let i = 0; i < lengths.length; i++) {
+    if (distance <= lengths[i]) {
+      const t = lengths[i] ? distance / lengths[i] : 0;
+      return {
+        coordinates: [
+          path[i][0] + (path[i + 1][0] - path[i][0]) * t,
+          path[i][1] + (path[i + 1][1] - path[i][1]) * t,
+        ],
+        heading: bearingBetween(path[i], path[i + 1]),
+      };
+    }
+    distance -= lengths[i];
+  }
+  const last = path.length - 1;
+  return {
+    coordinates: [...path[last]] as [number, number],
+    heading: bearingBetween(path[last - 1], path[last]),
+  };
+};
+const roadPosition = (from: PlaceId, to: PlaceId, t: number) => {
+  const path = fleetRoutes[`${from}|${to}`];
+  if (path) return alongPath(path, t);
+  const a = places[from],
+    b = places[to];
+  return { coordinates: along(a, b, t), heading: bearingBetween(a, b) };
+};
+/** Any cached route that ends at a place gives a real curbside coordinate there. */
+const arrivalPaths = (() => {
+  const byPlace: Partial<Record<PlaceId, [number, number][]>> = {};
+  for (const key of Object.keys(fleetRoutes)) {
+    const to = key.slice(key.indexOf("|") + 1) as PlaceId;
+    if (!byPlace[to]) byPlace[to] = fleetRoutes[key];
+  }
+  return byPlace;
+})();
+/**
+ * Parks a bus on the street rather than dropping it in the middle of a block:
+ * it backs up along the approach road so several buses queue along the curb
+ * instead of stacking on one pin.
+ */
+const curbPosition = (id: string, place: PlaceId) => {
+  const path = arrivalPaths[place];
+  const index = Math.max(1, Number(id.replace(/\D/g, "")) || 1) - 1;
+  if (!path) return { coordinates: parkSpread(id, places[place]), heading: 0 };
+  const lengths = segmentLengths(path);
+  const total = lengths.reduce((a, b) => a + b, 0);
+  const backOff = (index * 220) / DEG_TO_M;
+  const fraction = total ? Math.max(0, 1 - backOff / total) : 1;
+  return alongPath(path, fraction);
+};
 const parkSpread = (
   id: string,
   at: readonly [number, number],
@@ -290,6 +379,8 @@ export type FleetSnapshot = {
   area: string;
   eta: number;
   passengers: number;
+  /** Compass bearing the vehicle is travelling, degrees clockwise from north. */
+  heading: number;
 };
 const currentLeg = (v: Vehicle, minute: number) => {
   const now = wrap(minute);
@@ -312,6 +403,7 @@ export function fleetSnapshot(v: Vehicle, minute: number): FleetSnapshot {
       area: "Depot",
       eta: 0,
       passengers: 0,
+      heading: 0,
     };
   }
   const now = wrap(minute);
@@ -319,30 +411,30 @@ export function fleetSnapshot(v: Vehicle, minute: number): FleetSnapshot {
   if (active) {
     const t = (now - active.start) / Math.max(1, active.end - active.start);
     const approaching = t < 0.12;
+    const on = roadPosition(active.from, active.to, t);
     return {
-      coordinates: parkSpread(
-        v.id,
-        along(places[active.from], places[active.to], t),
-        0.0012,
-      ),
+      coordinates: on.coordinates,
       status: approaching ? "To pickup" : "On trip",
       destination: active.to,
       area: t < 0.5 ? active.from : active.to,
       eta: Math.max(1, Math.ceil(active.end - now)),
       passengers: active.passengers,
+      heading: on.heading,
     };
   }
   const upcoming = nextLeg(v, now);
   const parked = lastLeg(v, now);
-  const here = upcoming ? places[upcoming.from] : places[parked.to];
+  const place = upcoming ? upcoming.from : parked.to;
   const soon = upcoming && upcoming.start - now <= 25;
+  const curb = curbPosition(v.id, place);
   return {
-    coordinates: parkSpread(v.id, here),
+    coordinates: curb.coordinates,
     status: soon ? "To pickup" : "Available",
-    destination: upcoming ? upcoming.from : parked.to,
-    area: upcoming ? upcoming.from : parked.to,
+    destination: place,
+    area: place,
     eta: upcoming ? Math.max(0, upcoming.start - now) : 0,
     passengers: 0,
+    heading: curb.heading,
   };
 }
 export function fleetCoordinate(v: Vehicle, minute: number): [number, number] {

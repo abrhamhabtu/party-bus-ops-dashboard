@@ -10,7 +10,6 @@ import {
   landmarkIcon,
 } from "../lib/map/landmarks";
 import { mapStyle } from "../lib/map/style";
-import { spreadOverlappingLabels } from "../lib/labels";
 import { routes, stations, type Hotel, type Station } from "../lib/shuttling";
 import {
   cameraKind,
@@ -26,10 +25,23 @@ export type MapVehicle = {
   coordinates: [number, number];
   color: string;
   heading: number;
+  capacity: number;
   stale?: boolean;
 };
+export type VehiclePlacement = Record<
+  string,
+  { coordinates: [number, number]; heading: number }
+>;
 type Props = {
   vehicles: MapVehicle[];
+  /**
+   * Resamples every vehicle's place on its road at an arbitrary moment. The
+   * replay clock ticks in coarse jumps, so the map re-reads the route each
+   * animation frame instead of sliding vehicles straight between two far-apart
+   * samples — that is what keeps a bus on its street instead of cutting across
+   * blocks.
+   */
+  placementAt?: (minute: number) => VehiclePlacement;
   selected: string | null;
   onSelect: (id: string) => void;
   shuttle: boolean;
@@ -44,7 +56,15 @@ type Props = {
   command: { kind: string; id: number };
 };
 const vis = (on: boolean) => (on ? "visible" : "none");
-const partyBusMark = `<svg width="40" height="26" viewBox="0 0 40 26" fill="none" aria-hidden="true"><path d="M3 11.2L29 2.4L38 8.6L12 18.2Z" fill="currentColor"/><path d="M12 18.2L38 8.6V16.8L12 26Z" fill="currentColor" opacity=".72"/><path d="M3 11.2L12 18.2V26L3 19Z" fill="currentColor" opacity=".48"/><path d="M7.2 11.4L26.8 4.8L30.2 7.1L10.8 14Z" fill="#1b2836"/><path d="M15.6 17.2L20.8 15.2 22.2 16.2 17 18.2Z" fill="#1b2836" opacity=".9"/><path d="M23.2 14.4L28.4 12.4 29.8 13.4 24.6 15.4Z" fill="#1b2836" opacity=".9"/><path d="M33.6 11.2L36.6 13.2" stroke="#f3ead6" stroke-width="1.15" stroke-linecap="round"/><circle cx="16.4" cy="23.6" r="2.15" fill="#101820"/><circle cx="32.2" cy="17.6" r="2.15" fill="#101820"/><circle cx="16.4" cy="23.6" r=".7" fill="#4c5b6a"/><circle cx="32.2" cy="17.6" r=".7" fill="#4c5b6a"/></svg><span></span>`;
+/**
+ * Vehicles are drawn in plan view with the nose pointing up, so the marker's
+ * rotation can be set straight from the road bearing and the bus reads as
+ * driving along the street it is actually on.
+ */
+const partyBusMark = `<svg class="bus-art" width="14" height="32" viewBox="0 0 14 32" fill="none" aria-hidden="true"><path d="M7 .9c2.6 0 5.4 1.6 5.4 4.1v22c0 2.4-1.1 3.6-3 3.6H4.6c-1.9 0-3-1.2-3-3.6v-22C1.6 2.5 4.4.9 7 .9Z" fill="currentColor" stroke="#050c13" stroke-width=".9" stroke-linejoin="round"/><path d="M3.8 3.7c1.9-1.3 4.5-1.3 6.4 0l.5 2.2H3.3Z" fill="#cfe8ff" opacity=".9"/><rect x="3.2" y="7.7" width="7.6" height="18" rx="1.2" fill="#07141f" opacity=".5"/><rect x="1.9" y="8.5" width="1.6" height="3.1" rx=".5" fill="#07141f"/><rect x="1.9" y="12.7" width="1.6" height="3.1" rx=".5" fill="#07141f"/><rect x="1.9" y="16.9" width="1.6" height="3.1" rx=".5" fill="#07141f"/><rect x="1.9" y="21.1" width="1.6" height="3.1" rx=".5" fill="#07141f"/><rect x="10.5" y="8.5" width="1.6" height="3.1" rx=".5" fill="#07141f"/><rect x="10.5" y="12.7" width="1.6" height="3.1" rx=".5" fill="#07141f"/><rect x="10.5" y="16.9" width="1.6" height="3.1" rx=".5" fill="#07141f"/><rect x="10.5" y="21.1" width="1.6" height="3.1" rx=".5" fill="#07141f"/><rect x="6.5" y="8.2" width="1" height="17.2" rx=".5" fill="#ffe0ad" opacity=".55"/><rect x="3.3" y="27.6" width="2.6" height="1.3" rx=".55" fill="#ff8a6b" opacity=".95"/><rect x="8.1" y="27.6" width="2.6" height="1.3" rx=".55" fill="#ff8a6b" opacity=".95"/></svg>`;
+const sprinterMark = `<svg class="bus-art" width="13" height="22" viewBox="0 0 13 22" fill="none" aria-hidden="true"><path d="M6.5.9c2.4 0 4.8 1.4 4.8 3.6v13.7c0 2.1-1.1 3.2-3 3.2H4.7c-1.9 0-3-1.1-3-3.2V4.5C1.7 2.3 4.1.9 6.5.9Z" fill="currentColor" stroke="#050c13" stroke-width=".9" stroke-linejoin="round"/><path d="M3.5 3.4c1.8-1.2 4.2-1.2 6 0l.5 2.1H3Z" fill="#cfe8ff" opacity=".9"/><rect x="3.1" y="7.2" width="6.8" height="10.4" rx="1.1" fill="#07141f" opacity=".45"/><rect x="1.9" y="7.9" width="1.5" height="3.3" rx=".5" fill="#07141f"/><rect x="9.6" y="7.9" width="1.5" height="3.3" rx=".5" fill="#07141f"/><rect x="6" y="7.6" width="1" height="9.6" rx=".5" fill="#ffe0ad" opacity=".5"/><rect x="3.2" y="19" width="2.4" height="1.2" rx=".5" fill="#ff8a6b" opacity=".95"/><rect x="7.4" y="19" width="2.4" height="1.2" rx=".5" fill="#ff8a6b" opacity=".95"/></svg>`;
+const vehicleMark = (capacity: number) =>
+  capacity <= 12 ? sprinterMark : partyBusMark;
 function responsiveCamera(
   shuttle: boolean,
   minute: number,
@@ -63,6 +83,7 @@ function responsiveCamera(
 
 export default function FleetMap({
   vehicles,
+  placementAt,
   selected,
   onSelect,
   shuttle,
@@ -79,6 +100,9 @@ export default function FleetMap({
   const container = useRef<HTMLDivElement>(null),
     map = useRef<MapInstance | null>(null),
     markers = useRef(new Map<string, maplibregl.Marker>()),
+    labelMarkers = useRef(new Map<string, maplibregl.Marker>()),
+    shownMinute = useRef(minute),
+    targetMinute = useRef(minute),
     landmarkMarkers = useRef<maplibregl.Marker[]>([]),
     selectRef = useRef(onSelect);
   const [ready, setReady] = useState(false),
@@ -87,6 +111,7 @@ export default function FleetMap({
   const framing = useRef({ shuttle, minute, perspective });
   useEffect(() => {
     framing.current = { shuttle, minute, perspective };
+    targetMinute.current = minute;
   }, [shuttle, minute, perspective]);
   useEffect(() => {
     selectRef.current = onSelect;
@@ -302,7 +327,7 @@ export default function FleetMap({
         type: "fill-extrusion",
         source: "landmark-buildings",
         paint: {
-          "fill-extrusion-color": "#c49440",
+          "fill-extrusion-color": ["get", "color"],
           "fill-extrusion-height": ["get", "height"],
           "fill-extrusion-opacity": 0.82,
         },
@@ -346,7 +371,8 @@ export default function FleetMap({
         const el = document.createElement("button");
         el.className = "landmark-marker " + l.kind;
         el.setAttribute("aria-label", "Focus " + l.name);
-        el.innerHTML = landmarkIcon(l.kind) + "<span></span>";
+        el.innerHTML = landmarkIcon(l.kind, l.shape) + "<span></span>";
+        el.style.setProperty("--landmark-color", l.color);
         el.querySelector("span")!.textContent = l.name;
         el.addEventListener("click", () =>
           m.easeTo({ center: [...l.coordinates], zoom: 14.2, duration: 800 }),
@@ -377,6 +403,15 @@ export default function FleetMap({
       };
       m.on("move", positionLabels);
       positionLabels();
+      // Vehicles grow as you zoom in so they stay in proportion to the streets
+      // instead of looming over the whole Strip at valley zoom.
+      const scaleVehicles = () => {
+        const zoom = m.getZoom();
+        const scale = Math.min(1.9, Math.max(0.78, 0.78 + (zoom - 12) * 0.2));
+        m.getContainer().style.setProperty("--bus-scale", scale.toFixed(2));
+      };
+      m.on("zoom", scaleVehicles);
+      scaleVehicles();
       setReady(true);
     });
     m.on("error", (e) => {
@@ -507,58 +542,97 @@ export default function FleetMap({
         markers.current.delete(id);
       }
     });
-    if (!showVehicles) return;
-    const sync = () => {
-      const projected = vehicles.map((v) => {
-        const point = m.project(v.coordinates);
-        return { id: v.id, x: point.x, y: point.y };
-      });
-      const offsets = spreadOverlappingLabels(projected, 68);
-      const iconOffsets = spreadOverlappingLabels(projected, 22);
-      vehicles.forEach((v) => {
-        let marker = markers.current.get(v.id);
-        if (!marker) {
-          const el = document.createElement("button");
-          el.className = "map-bus";
-          el.type = "button";
-          el.innerHTML = partyBusMark;
-          el.addEventListener("click", () => selectRef.current(v.id));
-          marker = new maplibregl.Marker({ element: el, anchor: "center" })
+    if (!showVehicles) {
+      labelMarkers.current.forEach((marker) => marker.remove());
+      labelMarkers.current.clear();
+      return;
+    }
+    labelMarkers.current.forEach((marker, id) => {
+      if (!ids.has(id) || id !== selected) {
+        marker.remove();
+        labelMarkers.current.delete(id);
+      }
+    });
+    vehicles.forEach((v) => {
+      let marker = markers.current.get(v.id);
+      if (!marker) {
+        const el = document.createElement("button");
+        el.className = "map-bus";
+        el.type = "button";
+        el.innerHTML = vehicleMark(v.capacity);
+        el.addEventListener("click", () => selectRef.current(v.id));
+        marker = new maplibregl.Marker({
+          element: el,
+          anchor: "center",
+          rotationAlignment: "map",
+          pitchAlignment: "map",
+        })
+          .setLngLat(v.coordinates)
+          .addTo(m);
+        markers.current.set(v.id, marker);
+      }
+      marker.setLngLat(v.coordinates);
+      marker.setRotation(v.heading);
+      const el = marker.getElement();
+      if (!el.querySelector("svg")) el.innerHTML = vehicleMark(v.capacity);
+      el.style.setProperty("--vehicle-color", v.color);
+      el.classList.toggle("chosen", selected === v.id);
+      el.classList.toggle("stale", !!v.stale);
+      el.setAttribute("aria-label", `Locate ${v.name} · ${v.driver}`);
+      el.setAttribute("aria-pressed", String(selected === v.id));
+      // The name rides in its own upright marker so it stays readable while the
+      // vehicle itself lies flat on the road.
+      if (selected === v.id) {
+        let label = labelMarkers.current.get(v.id);
+        if (!label) {
+          const chip = document.createElement("div");
+          chip.className = "map-bus-label";
+          label = new maplibregl.Marker({
+            element: chip,
+            anchor: "bottom",
+            offset: [0, -14],
+          })
             .setLngLat(v.coordinates)
             .addTo(m);
-          markers.current.set(v.id, marker);
+          labelMarkers.current.set(v.id, label);
         }
-        marker.setLngLat(v.coordinates);
-        const el = marker.getElement();
-        if (!el.querySelector("svg")) el.innerHTML = partyBusMark;
-        const offset = offsets[v.id] ?? { dx: 0, dy: 0 };
-        const icon = iconOffsets[v.id] ?? { dx: 0, dy: 0 };
-        el.style.setProperty("--vehicle-color", v.color);
-        el.style.setProperty("--lx", `${offset.dx}px`);
-        el.style.setProperty("--ly", `${offset.dy}px`);
-        marker.setOffset(
-          Math.hypot(icon.dx, icon.dy) > 4
-            ? [icon.dx * 0.38, icon.dy * 0.38]
-            : [0, 0],
-        );
-        el.classList.toggle("chosen", selected === v.id);
-        el.classList.toggle("stale", !!v.stale);
-        el.classList.toggle(
-          "spread",
-          Math.abs(offset.dx) > 6 || Math.abs(offset.dy) > 6,
-        );
-        el.setAttribute("aria-label", `Locate ${v.name} · ${v.driver}`);
-        el.setAttribute("aria-pressed", String(selected === v.id));
-        el.querySelector("span")!.textContent = v.name;
-        el.style.zIndex = selected === v.id ? "12" : "3";
-      });
-    };
-    sync();
-    m.on("move", sync);
-    return () => {
-      m.off("move", sync);
-    };
+        label.setLngLat(v.coordinates);
+        const chip = label.getElement();
+        chip.textContent = v.name;
+        chip.style.setProperty("--vehicle-color", v.color);
+      }
+    });
   }, [vehicles, selected, showVehicles]);
+  // Glide the fleet between replay ticks. The clock eases toward the simulated
+  // minute and every frame re-reads each vehicle's position from its route, so
+  // buses trace the actual streets rather than jumping in straight lines.
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !placementAt || !showVehicles) return;
+    let frame = 0;
+    const step = () => {
+      const target = targetMinute.current;
+      const gap = target - shownMinute.current;
+      // A scrub or a midnight rollover is a jump, not motion — land on it.
+      shownMinute.current =
+        Math.abs(gap) > 30 ? target : shownMinute.current + gap * 0.16;
+      const placement = placementAt(shownMinute.current);
+      for (const [id, at] of Object.entries(placement)) {
+        const marker = markers.current.get(id);
+        if (!marker) continue;
+        marker.setLngLat(at.coordinates);
+        marker.setRotation(at.heading);
+        labelMarkers.current.get(id)?.setLngLat(at.coordinates);
+      }
+      // Marker DOM writes are queued against the map's own render pass, so ask
+      // for a frame or the fleet only visibly moves when something else
+      // repaints the map.
+      m.triggerRepaint();
+      frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [placementAt, showVehicles, ready]);
   return (
     <div
       className="map-renderer"

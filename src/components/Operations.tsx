@@ -1,4 +1,11 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   ArrowDownLeft,
   ArrowLeftRight,
@@ -29,9 +36,10 @@ import {
   Moon,
 } from "lucide-react";
 import CommandOverview from "./CommandOverview";
-import type { MapVehicle } from "./FleetMap";
+import type { MapVehicle, VehiclePlacement } from "./FleetMap";
 const FleetMap = lazy(() => import("./FleetMap"));
 import {
+  alongPath,
   fleet,
   fleetSnapshot,
   FLEET_DAY_MINUTES,
@@ -41,12 +49,12 @@ import { isNightOps } from "../lib/map/cameras";
 import {
   atStation,
   completedRuns,
-  coordinateAlong,
   driverRotation,
   inboundTo,
   isAirport,
   phaseLabel,
   progressAt,
+  routes,
   routeStats,
   SESSION_START,
   shuttleBoard,
@@ -234,6 +242,9 @@ export default function Operations({
       shuttle
         ? shuttles.map((v) => {
             const p = progressAt(v, minute, runs);
+            const returning = v.phase === "return";
+            const onRoute = alongPath(routes[v.hotel], returning ? 1 - p : p);
+            const parked = v.phase === "loading" || v.phase === "standby";
             return {
               id: v.id,
               name: v.name,
@@ -241,14 +252,14 @@ export default function Operations({
               coordinates:
                 v.phase === "terminal-hop"
                   ? terminalHopCoordinate(p)
-                  : v.phase === "loading" || v.phase === "standby"
+                  : parked
                     ? stations[v.terminal].coordinates
-                    : coordinateAlong(
-                        v.hotel,
-                        v.phase === "return" ? 1 - p : p,
-                      ),
+                    : onRoute.coordinates,
               color: shuttleColor(v),
-              heading: 0,
+              // Returning shuttles retrace the outbound line, so they face the
+              // other way down the same road.
+              heading: returning ? onRoute.heading + 180 : onRoute.heading,
+              capacity: v.capacity,
               stale: v.freshnessSeconds > 120,
             };
           })
@@ -260,9 +271,50 @@ export default function Operations({
               driver: v.driver,
               coordinates: snap.coordinates,
               color: snap.status === "Available" ? "#ffc65b" : "#36d5ff",
-              heading: 0,
+              heading: snap.heading,
+              capacity: v.capacity,
             })),
     [shuttle, shuttles, minute, runs, fleetLive],
+  );
+  // Re-reads every vehicle's spot on its route for an arbitrary minute so the
+  // map can animate between replay ticks without leaving the road.
+  const placementAt = useCallback(
+    (at: number) => {
+      const placement: VehiclePlacement = {};
+      if (shuttle) {
+        for (const v of shuttles) {
+          const p = progressAt(v, at, runs);
+          const returning = v.phase === "return";
+          const onRoute = alongPath(routes[v.hotel], returning ? 1 - p : p);
+          if (v.phase === "terminal-hop")
+            placement[v.id] = {
+              coordinates: terminalHopCoordinate(p),
+              heading: onRoute.heading,
+            };
+          else if (v.phase === "loading" || v.phase === "standby")
+            placement[v.id] = {
+              coordinates: [...stations[v.terminal].coordinates],
+              heading: onRoute.heading,
+            };
+          else
+            placement[v.id] = {
+              coordinates: onRoute.coordinates,
+              heading: returning ? onRoute.heading + 180 : onRoute.heading,
+            };
+        }
+        return placement;
+      }
+      for (const v of fleet) {
+        const snap = fleetSnapshot(v, at);
+        if (snap.status === "Offline") continue;
+        placement[v.id] = {
+          coordinates: snap.coordinates,
+          heading: snap.heading,
+        };
+      }
+      return placement;
+    },
+    [shuttle, shuttles, runs],
   );
   const mapCommand = (kind: string) => setCommand({ kind, id: Date.now() });
   function changeMode(next: boolean) {
@@ -398,6 +450,7 @@ export default function Operations({
       >
         <FleetMap
           vehicles={mapVehicles}
+          placementAt={placementAt}
           selected={selected}
           onSelect={setSelected}
           shuttle={shuttle}

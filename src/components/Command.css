@@ -680,53 +680,47 @@ body {
   background: none;
   border: 0;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 5px;
   cursor: pointer;
-  color: #ebc775;
+  color: var(--landmark-color, #d4b071);
   z-index: 4;
-  filter: drop-shadow(0 1px 3px #0008);
+  filter: drop-shadow(0 1px 3px #0009);
   width: auto;
   max-width: none;
 }
 .landmark-marker > svg {
-  width: 24px;
-  height: 34px;
+  width: 11px;
+  height: 11px;
   overflow: visible;
-  filter: drop-shadow(0 0 4px #eac05c66);
   pointer-events: none;
 }
 .landmark-marker > span {
-  background: #061321c9;
-  padding: 4px 5px;
+  background: #05111ccc;
+  padding: 3px 6px;
   border-radius: 3px;
-  color: #e5e4db;
-  font-size: 10px;
+  color: #d8e5f5;
+  font-size: 9.5px;
   white-space: nowrap;
   font-weight: 500;
-  letter-spacing: 0.1px;
-  border: 1px solid #d4ab5033;
+  letter-spacing: 0.24px;
+  border: 1px solid #ffffff14;
   max-width: 155px;
 }
 .landmark-marker.airport {
-  color: #c3a7ff;
+  --landmark-color: #b79bff;
 }
 .landmark-marker.airport > svg {
-  width: 26px;
-  height: 26px;
-  filter: drop-shadow(0 0 7px #9d61f9);
-}
-.landmark-marker.spire > svg {
-  height: 46px;
-  width: 21px;
+  width: 15px;
+  height: 15px;
 }
 .landmark-marker.compact-landmark > span {
   display: none;
 }
 .landmark-marker.compact-landmark > svg {
-  opacity: 0.7;
-  width: 19px;
-  height: 26px;
+  opacity: 0.55;
+  width: 8px;
+  height: 8px;
 }
 .landmark-marker:hover > span,
 .landmark-marker:focus-visible > span {
@@ -735,39 +729,51 @@ body {
 .landmark-marker:hover {
   z-index: 7 !important;
 }
+/* Vehicles lie flat on the road surface, so the hit area is a fixed square and
+   only the artwork inside carries the shape. */
 .map-bus {
-  padding: 4px;
+  padding: 0;
   min-width: 0;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  gap: 0;
   z-index: 3;
-}
-.map-bus svg {
-  width: 42px !important;
-  height: 30px !important;
-  filter: drop-shadow(0 0 6px var(--vehicle-color)) drop-shadow(0 3px 2px #000);
-  stroke: var(--vehicle-color);
-  stroke-width: 0.35;
-}
-.map-bus > span {
-  position: absolute;
-  top: 100%;
-  opacity: 0;
-  transition: opacity 0.12s;
-  background: #071c2edc !important;
-  border-color: #346086 !important;
-  color: #c3e6ff !important;
-  font-size: 9px !important;
-}
-.map-bus.chosen > span,
-.map-bus:hover > span,
-.map-bus:focus-visible > span {
-  opacity: 1;
-}
-.map-bus.chosen svg {
-  filter: drop-shadow(0 0 10px var(--vehicle-color));
-}
-.map-bus.stale svg {
   filter: none;
-  opacity: 0.5;
+}
+.map-bus .bus-art {
+  width: auto !important;
+  height: auto !important;
+  filter: drop-shadow(0 1px 1.5px #01060bcc);
+  stroke: none;
+  transform: scale(var(--bus-scale, 1));
+  transition: transform 0.15s ease-out;
+}
+.map-bus.chosen .bus-art {
+  filter: drop-shadow(0 0 4px var(--vehicle-color))
+    drop-shadow(0 1px 2px #01060b);
+  transform: scale(calc(var(--bus-scale, 1) * 1.25));
+}
+.map-bus:hover .bus-art {
+  transform: scale(calc(var(--bus-scale, 1) * 1.14));
+}
+.map-bus.stale .bus-art {
+  filter: grayscale(0.5) drop-shadow(0 1px 1.5px #01060bcc);
+  opacity: 0.55;
+}
+.map-bus-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  padding: 3px 6px;
+  border-radius: 3px;
+  background: #071c2eec;
+  border: 1px solid var(--vehicle-color, #346086);
+  color: #dcefff;
+  pointer-events: none;
+  box-shadow: 0 2px 8px #01060b99;
 }
 .verizon-setup {
   background: #091a2c;
@@ -1867,9 +1873,9 @@ body {
   .landmark-marker.airport > svg {
     width: 21px;
   }
-  .map-bus svg {
-    width: 34px !important;
-    height: 25px !important;
+  .map-bus {
+    width: 34px;
+    height: 34px;
   }
   .vehicle-inspector {
     position: fixed;
